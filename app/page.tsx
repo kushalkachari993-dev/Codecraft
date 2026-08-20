@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { SignInButton, useAuth, useClerk, useUser } from "@clerk/react";
 import { PYTHON_PACES, type PythonPaceId, type PythonTopic } from "./python-curriculum";
 import { GENAI_PACES, buildGenAILab, validateGenAILab, type GenAIPaceId, type GenAITopic } from "./genai-curriculum";
@@ -8,7 +8,7 @@ import { SQL_PACES, type SQLPaceId, type SQLTopic } from "./sql-curriculum";
 import { executeLab } from "./execution/client";
 import { buildPythonChallenge, buildSQLChallenge } from "./challenges";
 import type { ExecutionResult } from "./execution/types";
-import { DEFAULT_PROGRESS, mergeProgress, normalizeProgress, type PlayerProgress } from "./progress";
+import { DEFAULT_PROGRESS, mergeProgress, normalizeProgress, type AvatarId, type PlayerProgress } from "./progress";
 
 type RunState = "idle" | "running" | "ready" | "error" | "complete";
 type View = "tracks" | "paces" | "roadmap" | "quest";
@@ -73,6 +73,12 @@ const TRACKS: Track[] = [
   { id: "python", label: "Python", world: "Logic Highlands", worldTwo: "The Function Relay", kicker: "PYTHON TRAIL", description: "Learn programming foundations while Byte restores the living systems of the Code Realms.", outcome: "Commands · Loops · Functions · Collections", mission: "Repair the Logic Relay and reconnect every automation node.", energy: "Lumen shards", icon: "Py", nextWorld: "Object Odyssey" },
   { id: "genai", label: "GenAI", world: "Prompt Frontier", worldTwo: "The Agent Foundry", kicker: "AI EXPLORER TRAIL", description: "Learn how to prompt, guide, structure, and evaluate intelligent systems across a fractured signal frontier.", outcome: "Prompts · Grounding · Tools · Evaluation", mission: "Rebuild the Signal Archive and teach its agents to respond reliably.", energy: "Echo cores", icon: "AI", nextWorld: "Multimodal Metropolis" },
   { id: "sql", label: "SQL", world: "Data Depths", worldTwo: "The Analytics Citadel", kicker: "DATABASE TRAIL", description: "Explore a buried data realm using queries that reveal, connect, and analyze its records.", outcome: "SELECT · JOIN · Subqueries · Windows", mission: "Restore the Data Nexus and recover the realm's lost records.", energy: "Index crystals", icon: "DB", nextWorld: "Performance Nexus" },
+];
+
+const AVATARS: Array<{ id: AvatarId; name: string; glyph: string; description: string; unlockAt: number }> = [
+  { id: "relay-scout", name: "Relay Scout", glyph: "◇", description: "Fast, curious, and tuned to hidden signals.", unlockAt: 0 },
+  { id: "signal-mage", name: "Signal Mage", glyph: "✦", description: "Channels knowledge into powerful system repairs.", unlockAt: 5 },
+  { id: "core-runner", name: "Core Runner", glyph: "◆", description: "Built for world projects and deep system missions.", unlockAt: 15 },
 ];
 
 const PYTHON_PACE_XP: Record<PythonPaceId, number> = { beginner: 35, intermediate: 60, expert: 90 };
@@ -411,6 +417,8 @@ export default function Home() {
   const [nameError, setNameError] = useState("");
   const [savedSubmissions, setSavedSubmissions] = useState<SavedSubmission[]>([]);
   const [submissionsState, setSubmissionsState] = useState<SubmissionsState>("idle");
+  const [storyStep, setStoryStep] = useState(0);
+  const [gameToast, setGameToast] = useState("");
   const clerkDisplayName = clerkProfile?.fullName
     ?? clerkProfile?.firstName
     ?? clerkProfile?.primaryEmailAddress?.emailAddress
@@ -472,6 +480,38 @@ export default function Home() {
     return { ...track, completed, total, projects, percent: Math.round((completed / total) * 100) };
   });
   const totalProjects = trackProfileStats.reduce((sum, track) => sum + track.projects, 0);
+  const activeAvatar = AVATARS.find((avatar) => avatar.id === progress.game.avatarId) ?? AVATARS[0];
+  const activeWorlds = activeModules.reduce<Array<{ name: string; number: number; start: number; end: number; completed: number; size: number; projectComplete: boolean; unlocked: boolean }>>((worlds, module, index) => {
+    const start = worlds.length ? worlds[worlds.length - 1].end + 1 : 1;
+    const end = start + module.size - 1;
+    const completed = trackCompleted.filter((id) => id >= start && id <= end).length;
+    const previousWorld = worlds[index - 1];
+    worlds.push({ name: module.name, number: index + 1, start, end, completed, size: module.size, projectComplete: trackBonus.includes(end), unlocked: index === 0 || Boolean(previousWorld?.projectComplete) });
+    return worlds;
+  }, []);
+  const currentWorldIndex = Math.max(0, activeWorlds.findIndex((world) => (nextQuest?.id ?? activeQuest.id) >= world.start && (nextQuest?.id ?? activeQuest.id) <= world.end));
+  const byteStory = pathComplete
+    ? ["Every relay in this path is stable. The next frontier is ready when you are.", "I saved a map of every repair we made. That is what mastery looks like.", "Replay a world, explore another pace, or open your inventory to inspect the recovered artifacts."]
+    : pendingRequiredProject
+      ? [`${pendingRequiredProject.title} is understood. Now we need to prove it under pressure.`, `The guardian simulation is active in ${activeWorlds[currentWorldIndex]?.name ?? "this world"}. This is your boss mission.`, "Pass every runtime check and the next world gate will open."]
+      : [`Signal detected in ${activeWorlds[currentWorldIndex]?.name ?? "this world"}. The next unstable system is ${nextQuest?.title ?? activeQuest.title}.`, "Each topic repairs part of the landscape. Watch the world node energize after your checkpoint.", "Theory gives us the map. Your choices and code bring the realm back online."];
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const dailyTopics = progress.game.dailyDate === todayKey ? progress.game.dailyTopics : 0;
+  const dailyLabs = progress.game.dailyDate === todayKey ? progress.game.dailyLabs : 0;
+  const achievements = [
+    { id: "first-signal", icon: "◇", name: "First Signal", detail: "Complete your first topic", unlocked: totalBadges >= 1 },
+    { id: "badge-hunter", icon: "✦", name: "Badge Hunter", detail: "Recover 10 topic badges", unlocked: totalBadges >= 10 },
+    { id: "world-restorer", icon: "◆", name: "World Restorer", detail: "Defeat a world boss", unlocked: totalProjects >= 1 },
+    { id: "three-realms", icon: "△", name: "Three Realms", detail: "Study Python, GenAI, and SQL", unlocked: trackProfileStats.every((track) => track.completed > 0) },
+    { id: "streak-runner", icon: "↟", name: "Streak Runner", detail: "Reach a 3-day streak", unlocked: progress.game.streakDays >= 3 },
+    { id: "path-master", icon: "◈", name: "Path Master", detail: "Complete an entire learning path", unlocked: Object.entries(progress.completed).some(([key, ids]) => {
+      const [trackId, paceId] = key.split("-");
+      const paces = trackId === "python" ? PYTHON_PACES : trackId === "genai" ? GENAI_PACES : trackId === "sql" ? SQL_PACES : [];
+      const pace = paces.find((item) => item.id === paceId);
+      return Boolean(pace && ids.length === pace.topics.length);
+    }) },
+  ];
+  const unlockedAchievements = achievements.filter((achievement) => achievement.unlocked).length;
   const focusedModule = activeTrack.id === "python"
     ? getPythonModule(activePythonPaceId, nextQuest?.id ?? activeQuest.id)
     : activeTrack.id === "genai"
@@ -615,6 +655,82 @@ export default function Home() {
     window.localStorage.setItem("codecraft-progress-v3", JSON.stringify(normalized));
     window.localStorage.setItem("codecraft-xp", String(normalized.xp));
     setProgress(normalized);
+  };
+
+  const playGameSound = (kind: "select" | "complete" | "boss" = "select") => {
+    if (!progress.game.soundEnabled || typeof window === "undefined") return;
+    const AudioContextClass = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const context = new AudioContextClass();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = kind === "boss" ? "sawtooth" : "square";
+    oscillator.frequency.setValueAtTime(kind === "complete" ? 620 : kind === "boss" ? 180 : 360, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(kind === "complete" ? 980 : kind === "boss" ? 420 : 520, context.currentTime + .12);
+    gain.gain.setValueAtTime(.035, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .16);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + .17);
+    oscillator.addEventListener("ended", () => void context.close(), { once: true });
+  };
+
+  const recordGameActivity = (baseProgress: PlayerProgress, kind: "topic" | "lab", worldProject = false) => {
+    const currentDay = new Date();
+    const today = currentDay.toISOString().slice(0, 10);
+    const previousDay = new Date(currentDay);
+    previousDay.setUTCDate(currentDay.getUTCDate() - 1);
+    const yesterday = previousDay.toISOString().slice(0, 10);
+    const sameDay = baseProgress.game.dailyDate === today;
+    const dailyTopicsNext = (sameDay ? baseProgress.game.dailyTopics : 0) + (kind === "topic" ? 1 : 0);
+    const dailyLabsNext = (sameDay ? baseProgress.game.dailyLabs : 0) + (kind === "lab" ? 1 : 0);
+    const firstActivityToday = baseProgress.game.lastActiveDate !== today;
+    const streakDays = firstActivityToday
+      ? baseProgress.game.lastActiveDate === yesterday ? Math.max(1, baseProgress.game.streakDays + 1) : 1
+      : baseProgress.game.streakDays;
+    const dailyClaimedPreviously = sameDay && baseProgress.game.dailyClaimed;
+    const dailyRewardEarned = dailyTopicsNext >= 1 && !dailyClaimedPreviously;
+    const totalCompletedNext = Object.values(baseProgress.completed).reduce((sum, ids) => sum + ids.length, 0);
+    const inventory = new Set(baseProgress.game.inventory);
+    inventory.add("Signal Compass");
+    if (totalCompletedNext >= 1) inventory.add("Circuit Key");
+    if (totalCompletedNext >= 5) inventory.add("Byte Beacon");
+    if (totalCompletedNext >= 10) inventory.add("Archive Lens");
+    if (worldProject) inventory.add(`${activeTrack.label} Relay Core`);
+    if (kind === "lab") inventory.add("Runtime Shard");
+    if (dailyRewardEarned) {
+      inventory.add("Daily Signal Cache");
+      setGameToast("DAILY MISSION COMPLETE · +25 XP · Signal Cache recovered");
+    }
+    return {
+      ...baseProgress,
+      xp: baseProgress.xp + (dailyRewardEarned ? 25 : 0),
+      game: {
+        ...baseProgress.game,
+        streakDays,
+        lastActiveDate: today,
+        dailyDate: today,
+        dailyTopics: dailyTopicsNext,
+        dailyLabs: dailyLabsNext,
+        dailyClaimed: dailyClaimedPreviously || dailyRewardEarned,
+        inventory: [...inventory],
+        updatedAt: baseProgress.game.updatedAt + 1,
+      },
+    };
+  };
+
+  const chooseAvatar = (avatarId: AvatarId) => {
+    const avatar = AVATARS.find((item) => item.id === avatarId);
+    if (!avatar || totalBadges < avatar.unlockAt) return;
+    playGameSound("select");
+    persistProgress({ ...progress, game: { ...progress.game, avatarId, updatedAt: progress.game.updatedAt + 1 } });
+  };
+
+  const toggleSound = () => {
+    const soundEnabled = !progress.game.soundEnabled;
+    persistProgress({ ...progress, game: { ...progress.game, soundEnabled, updatedAt: progress.game.updatedAt + 1 } });
+    if (soundEnabled) window.setTimeout(() => playGameSound("select"), 0);
   };
 
   const openProfile = () => {
@@ -790,6 +906,15 @@ export default function Home() {
     setView("quest");
   };
 
+  const enterWorld = (world: (typeof activeWorlds)[number]) => {
+    if (!world.unlocked) return;
+    playGameSound(world.projectComplete ? "complete" : "select");
+    const nextWorldQuest = activeQuests.find((quest) => quest.id >= world.start && quest.id <= world.end && !trackCompleted.includes(quest.id));
+    const bossPending = !nextWorldQuest && !trackBonus.includes(world.end);
+    const destination = nextWorldQuest ?? activeQuests[world.end - 1];
+    openQuest(destination, bossPending);
+  };
+
   const runCode = async () => {
     executionAbort.current?.abort();
     const controller = new AbortController();
@@ -869,7 +994,7 @@ export default function Home() {
     }
 
     if (!trackCompleted.includes(activeQuest.id)) {
-      const nextProgress = {
+      const nextProgress: PlayerProgress = {
         ...progress,
         xp: progress.xp + activeQuest.xp,
         completed: {
@@ -877,7 +1002,8 @@ export default function Home() {
           [progressKey]: [...trackCompleted, activeQuest.id].sort((a, b) => a - b),
         },
       };
-      persistProgress(nextProgress);
+      persistProgress(recordGameActivity(nextProgress, "topic"));
+      playGameSound("complete");
     }
     setQuizResult("passed");
   };
@@ -907,12 +1033,13 @@ export default function Home() {
       return;
     }
     if (!trackBonus.includes(activeQuest.id)) {
-      const nextProgress = {
+      const nextProgress: PlayerProgress = {
         ...progress,
         xp: progress.xp + bonusXp,
         bonus: { ...progress.bonus, [progressKey]: [...trackBonus, activeQuest.id].sort((a, b) => a - b) },
       };
-      persistProgress(nextProgress);
+      persistProgress(recordGameActivity(nextProgress, "lab", isRequiredWorldProject));
+      playGameSound(isRequiredWorldProject ? "boss" : "complete");
     }
     if (executionResult) saveSubmission(executionResult, "submitted");
     setStatus("complete");
@@ -943,7 +1070,8 @@ export default function Home() {
         <div className="player-stats">
           <button className="stat-chip profile-stat-trigger" onClick={openProfile} aria-label={`Open profile, ${progress.xp} XP`}><b>◆</b> {progress.xp} XP</button>
           <span className="stat-chip badge-count"><b>✦</b> {totalBadges}</span>
-          <button className="avatar" onClick={openProfile} aria-haspopup="dialog" aria-expanded={profileOpen} aria-controls="codecraft-profile" aria-label={`Open ${profileDisplayName}'s profile, level ${level}`}>{profileInitial}<small>LV {level}</small></button>
+          <button className={`sound-toggle ${progress.game.soundEnabled ? "on" : "off"}`} onClick={toggleSound} aria-label={`${progress.game.soundEnabled ? "Mute" : "Enable"} game sounds`}>{progress.game.soundEnabled ? "♪" : "×"}</button>
+          <button className={`avatar ${activeAvatar.id}`} onClick={openProfile} aria-haspopup="dialog" aria-expanded={profileOpen} aria-controls="codecraft-profile" aria-label={`Open ${profileDisplayName}'s profile, level ${level}`}>{activeAvatar.glyph}<small>LV {level}</small></button>
           {clerkSignedIn ? (
             <span className={`auth-account ${cloudState}`}>{cloudState === "syncing" ? "Syncing…" : cloudState === "error" ? "Sync error" : cloudState === "synced" ? "Cloud saved" : "Signed in"}</span>
           ) : (
@@ -952,13 +1080,15 @@ export default function Home() {
         </div>
       </header>
 
+      {gameToast && <div className="game-toast" role="status"><span>✦</span><strong>{gameToast}</strong><button onClick={() => setGameToast("")} aria-label="Dismiss reward notification">×</button></div>}
+
       {profileOpen && (
         <div className="profile-backdrop">
           <button className="profile-backdrop-dismiss" onClick={closeProfile} aria-label="Close profile" />
           <section className="profile-panel" id="codecraft-profile" role="dialog" aria-modal="true" aria-labelledby="profile-title">
             <button className="profile-close" onClick={closeProfile} aria-label="Close profile">×</button>
             <header className="profile-panel-hero">
-              <div className="profile-panel-avatar" aria-hidden="true">{profileInitial}<small>LV {level}</small></div>
+              <div className={`profile-panel-avatar ${activeAvatar.id}`} aria-hidden="true">{activeAvatar.glyph}<small>LV {level}</small></div>
               <div>
                 <p>CODECRAFT PLAYER PROFILE</p>
                 <h2 id="profile-title">{profileDisplayName}</h2>
@@ -998,6 +1128,26 @@ export default function Home() {
                     <b>{track.percent}%</b>
                   </article>
                 ))}
+              </div>
+            </section>
+
+            <section className="profile-loadout">
+              <div className="profile-section-heading"><div><p>Avatar loadout</p><span>Choose the explorer representing you in the Code Realms.</span></div><strong>{activeAvatar.name.toUpperCase()}</strong></div>
+              <div className="avatar-options">
+                {AVATARS.map((avatar) => {
+                  const unlocked = totalBadges >= avatar.unlockAt;
+                  return <button className={`${avatar.id} ${progress.game.avatarId === avatar.id ? "selected" : ""}`} key={avatar.id} disabled={!unlocked} onClick={() => chooseAvatar(avatar.id)}><span>{unlocked ? avatar.glyph : "▣"}</span><strong>{avatar.name}</strong><small>{unlocked ? avatar.description : `Unlock at ${avatar.unlockAt} badges`}</small></button>;
+                })}
+              </div>
+            </section>
+
+            <section className="profile-collection">
+              <div className="profile-section-heading"><div><p>Inventory & achievements</p><span>Artifacts come from learning, labs, daily missions, and boss projects.</span></div><strong>{progress.game.inventory.length} ITEMS</strong></div>
+              <div className="inventory-grid">
+                {progress.game.inventory.map((item, index) => <div key={item}><span>{["◇", "◆", "✦", "◈"][index % 4]}</span><strong>{item}</strong></div>)}
+              </div>
+              <div className="achievement-grid" aria-label={`${unlockedAchievements} of ${achievements.length} achievements unlocked`}>
+                {achievements.map((achievement) => <article className={achievement.unlocked ? "unlocked" : "locked"} key={achievement.id}><span>{achievement.unlocked ? achievement.icon : "?"}</span><div><strong>{achievement.name}</strong><small>{achievement.detail}</small></div></article>)}
               </div>
             </section>
 
@@ -1131,6 +1281,39 @@ export default function Home() {
             <div className="hero-byte" aria-label="Byte the robot"><span>◆</span><b>BYTE</b></div>
           </section>
 
+          <section className="realm-command-center" aria-labelledby="realm-map-title">
+            <header className="realm-command-header">
+              <div><p className="pixel-kicker">LIVE REALM MAP · {activePace.label.toUpperCase()} PATH</p><h2 id="realm-map-title">Travel through the restored worlds</h2><span>Select any unlocked world. Your checkpoints and projects visibly energize its relay.</span></div>
+              <div className="game-hud"><article><small>STREAK</small><strong>{progress.game.streakDays} DAYS</strong></article><article><small>INVENTORY</small><strong>{progress.game.inventory.length} ITEMS</strong></article><article><small>ACHIEVEMENTS</small><strong>{unlockedAchievements}/{achievements.length}</strong></article></div>
+            </header>
+
+            <div className="byte-comm">
+              <span className="byte-comm-face">◆<small>BYTE</small></span>
+              <div><p>GUIDE TRANSMISSION {storyStep + 1}/{byteStory.length}</p><strong>{byteStory[storyStep % byteStory.length]}</strong></div>
+              <button onClick={() => { playGameSound("select"); setStoryStep((current) => (current + 1) % byteStory.length); }}>Next transmission →</button>
+            </div>
+
+            <div className="realm-map" style={{ "--world-count": activeWorlds.length } as CSSProperties}>
+              <div className="realm-route" aria-hidden="true"><i style={{ width: `${activeWorlds.length > 1 ? (currentWorldIndex / (activeWorlds.length - 1)) * 100 : 100}%` }} /></div>
+              {activeWorlds.map((world, index) => {
+                const percent = Math.round((world.completed / world.size) * 100);
+                const restored = world.completed === world.size && world.projectComplete;
+                const bossReady = world.completed === world.size && !world.projectComplete;
+                return (
+                  <button className={`realm-world-node ${restored ? "restored" : bossReady ? "boss-ready" : world.unlocked ? "active" : "locked"} ${index === currentWorldIndex ? "player-here" : ""}`} key={world.name} onClick={() => enterWorld(world)} disabled={!world.unlocked}>
+                    {index === currentWorldIndex && <span className={`map-player ${activeAvatar.id}`}>{activeAvatar.glyph}<small>YOU</small></span>}
+                    <span className="realm-world-art" aria-hidden="true"><i /><i /><b>{restored ? "✓" : bossReady ? "!" : world.unlocked ? world.number : "▣"}</b></span>
+                    <small>WORLD {String(world.number).padStart(2, "0")}</small>
+                    <strong>{world.name}</strong>
+                    <p>{restored ? "Relay fully restored" : bossReady ? "Boss project ready" : world.unlocked ? `${world.completed}/${world.size} systems repaired` : "Locked by previous boss"}</p>
+                    <div><i style={{ width: `${restored ? 100 : percent}%` }} /></div>
+                    <em>{restored ? "EXPLORE" : bossReady ? "ENTER BOSS" : world.unlocked ? "TRAVEL" : "LOCKED"}</em>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
           <div className="roadmap-layout">
             <section className="trail-panel">
               <div className="section-heading">
@@ -1153,20 +1336,21 @@ export default function Home() {
                   const isModuleStart = isPacedTrack ? quest.id === paceModule?.start : quest.id === 1 || quest.id === 5;
                   const moduleUnlocked = isUnlocked(quest);
                   const worldNumber = isPacedTrack ? paceModule?.number ?? 1 : quest.id <= 4 ? 1 : 2;
+                  const isWorldBoss = quest.id === paceModule?.end;
                   const projectPending = quest.id === paceModule?.end && complete && !trackBonus.includes(quest.id);
                   return (
                     <Fragment key={quest.id}>
                       {isModuleStart && <div className={`world-divider ${quest.id === 1 ? "world-one" : moduleUnlocked ? "unlocked" : "locked"}`}><span>WORLD {String(worldNumber).padStart(2, "0")}</span><div><strong>{isPacedTrack ? paceModule?.name : quest.id === 1 ? activeTrack.world : activeTrack.worldTwo}</strong><small>{moduleUnlocked ? isPacedTrack ? `TOPICS ${paceModule?.start}–${paceModule?.end} · ${activePace.label.toUpperCase()}` : quest.id === 1 ? "FOUNDATION RELAY · QUESTS 1–4" : "RELAY LINKED · ADVANCED REALM" : `COMPLETE WORLD ${worldNumber - 1} APPLIED PROJECT TO ENTER`}</small></div></div>}
-                      <article className={`quest-card ${complete ? "complete" : ""} ${projectPending ? "project-pending" : ""} ${!unlocked ? "locked" : ""}`}>
+                      <article className={`quest-card ${complete ? "complete" : ""} ${isWorldBoss ? "boss-gate" : ""} ${projectPending ? "project-pending" : ""} ${!unlocked ? "locked" : ""}`}>
                         <div className="quest-node"><span>{complete ? "✓" : unlocked ? quest.id : "▣"}</span></div>
                         <div className="quest-card-copy">
                           <p>WORLD {String(worldNumber).padStart(2, "0")} · {isPacedTrack ? `TOPIC ${String(quest.id).padStart(2, "0")}` : `CHAPTER ${String(quest.id <= 4 ? quest.id : quest.id - 4).padStart(2, "0")}`} · {quest.chapter.toUpperCase()}</p>
                           <h3>{quest.title}</h3>
                           <span>{quest.description}</span>
-                          <div className="quest-rewards"><small>◆ {quest.xp} XP</small><small>✦ {quest.badge}</small>{projectPending && <small>⚡ WORLD PROJECT REQUIRED</small>}</div>
+                          <div className="quest-rewards"><small>◆ {quest.xp} XP</small><small>✦ {quest.badge}</small>{isWorldBoss && <small>⚔ WORLD BOSS</small>}{projectPending && <small>⚡ PROJECT REQUIRED</small>}</div>
                         </div>
                         <button disabled={!unlocked} onClick={() => openQuest(quest, projectPending)}>
-                          {projectPending ? "Finish project" : complete ? "Replay" : unlocked ? "Start" : "Locked"}
+                          {projectPending ? "Enter boss" : complete ? "Replay" : unlocked ? isWorldBoss ? "Approach boss" : "Start" : "Locked"}
                         </button>
                       </article>
                     </Fragment>
@@ -1189,10 +1373,11 @@ export default function Home() {
                 <p className="panel-note">{focusedModule ? `Showing ${focusedModule.name}. Complete every topic to collect all ${activeQuests.length} signal badges.` : "Complete each chapter to recover its signal badge."}</p>
               </div>
               <div className="daily-card">
-                <p>DAILY OBJECTIVE</p>
+                <p>DAILY MISSION · {progress.game.streakDays} DAY STREAK</p>
                 <strong>Restore one system</strong>
-                <div><i className={completedCount ? "done" : ""} /></div>
-                <span>{completedCount ? "Complete · +10 signal bonus" : "0 / 1 systems today"}</span>
+                <div><i className={dailyTopics >= 1 ? "done" : ""} /></div>
+                <span>{dailyTopics >= 1 ? "Complete · +25 XP cache recovered" : `${dailyTopics} / 1 topics today`}</span>
+                <small>Side objective: complete a lab · {dailyLabs}/1</small>
               </div>
               <div className="world-legend">
                 <p>RELAY SKILLS</p>
@@ -1215,6 +1400,12 @@ export default function Home() {
               const done = index < stageIndex || isStageComplete(stage);
               return <span className={index === stageIndex ? "active" : done ? "done" : ""} key={stage}><i>{done ? "✓" : index + 1}</i>{stage === "quiz" ? "Checkpoint" : stage === "bonus" ? isRequiredWorldProject ? "World project" : activeGenAILab ? "AI lab" : "Optional code" : stage[0].toUpperCase() + stage.slice(1)}</span>;
             })}
+          </div>
+
+          <div className={`quest-story-strip ${isRequiredWorldProject ? "boss-mission" : ""}`}>
+            <span>◆<small>BYTE</small></span>
+            <p><strong>{isRequiredWorldProject ? `BOSS MISSION · ${currentModule.name}` : `SYSTEM REPAIR · ${activeQuest.title}`}</strong>{isRequiredWorldProject ? "The world guardian is testing everything you learned here. Clear the checkpoint, then stabilize the live system to open the gate." : `This lesson controls one part of ${currentModule.name}. Complete the checkpoint and watch its realm signal turn on.`}</p>
+            <div><i className={trackCompleted.includes(activeQuest.id) ? "active" : ""} /><i className={trackBonus.includes(activeQuest.id) ? "active" : ""} /></div>
           </div>
 
           {lessonStage === "theory" ? (
@@ -1278,7 +1469,7 @@ export default function Home() {
           <div className="lesson-workspace">
             <section className="lesson-content">
               <div className="lesson-copy">
-                <p className="pixel-kicker">{isRequiredWorldProject ? "REQUIRED WORLD PROJECT" : "OPTIONAL PRACTICE"} · +{bonusXp} XP</p>
+                <p className="pixel-kicker">{isRequiredWorldProject ? "WORLD BOSS · REQUIRED PROJECT" : "OPTIONAL SIDE MISSION"} · +{bonusXp} XP</p>
                 <h1>{activeGenAILab?.title ?? activeChallenge?.title ?? "Optional coding challenge"}</h1>
                 <p>{activeGenAILab?.brief ?? activeChallenge?.instructions ?? `Rebuild the ${activeQuest.concept} solution from a blank editor. This practice does not block your progress to the next section.`}</p>
                 <div className="objective-card"><span>◆</span><div><small>YOUR OBJECTIVE</small><strong>{activeQuest.objective}</strong></div></div>
@@ -1339,7 +1530,7 @@ export default function Home() {
               <div className="editor-actions">
                 <span>Ctrl + Enter to run</span>
                 {status === "running" ? <button className="stop-execution" onClick={stopExecution}>■ Stop execution</button> : <button className="run-secondary" onClick={runCode}>▶ {activeGenAILab ? "Evaluate lab" : activeTrack.id === "sql" ? "Run SQL" : "Run Python"}</button>}
-                <button className="submit-primary" onClick={submitBonus} disabled={status !== "ready" && status !== "complete"}>Submit {isRequiredWorldProject ? "world project" : activeGenAILab ? "practice lab" : "optional challenge"}</button>
+                <button className="submit-primary" onClick={submitBonus} disabled={status !== "ready" && status !== "complete"}>Submit {isRequiredWorldProject ? "boss project" : activeGenAILab ? "practice lab" : "optional challenge"}</button>
               </div>
               <div className={`terminal ${status}`}>
                 <div><span>{activeGenAILab ? "CONTROLLED AI EVALUATOR" : activeTrack.id === "sql" ? "POSTGRESQL OUTPUT" : "PYTHON OUTPUT"}</span><i>{status === "running" ? "RUNNING" : status.toUpperCase()}</i></div>
@@ -1355,7 +1546,7 @@ export default function Home() {
               </div>
               {status === "complete" && (
                 <div className="quest-complete-banner">
-                  <div><span>✦</span><p><small>{isRequiredWorldProject ? "WORLD PROJECT COMPLETE" : "OPTIONAL PRACTICE"}</small><strong>+{bonusXp} {isRequiredWorldProject ? "project" : "bonus"} XP</strong></p></div>
+                  <div><span>✦</span><p><small>{isRequiredWorldProject ? "WORLD BOSS DEFEATED" : "SIDE MISSION COMPLETE"}</small><strong>+{bonusXp} {isRequiredWorldProject ? "project" : "bonus"} XP</strong></p></div>
                   <button onClick={openNextSection}>{isRequiredWorldProject ? isFinalQuest ? "Finish path" : "Enter next world" : "Next section"} →</button>
                 </div>
               )}

@@ -4,11 +4,39 @@ export const PROGRESS_KEYS = [
   "sql", "sql-beginner", "sql-intermediate", "sql-expert",
 ] as const;
 
+export type AvatarId = "relay-scout" | "signal-mage" | "core-runner";
+export type GameProfile = {
+  avatarId: AvatarId;
+  soundEnabled: boolean;
+  streakDays: number;
+  lastActiveDate: string;
+  dailyDate: string;
+  dailyTopics: number;
+  dailyLabs: number;
+  dailyClaimed: boolean;
+  inventory: string[];
+  updatedAt: number;
+};
+
 export type PlayerProgress = {
   xp: number;
   completed: Record<string, number[]>;
   coding: Record<string, number[]>;
   bonus: Record<string, number[]>;
+  game: GameProfile;
+};
+
+export const DEFAULT_GAME_PROFILE: GameProfile = {
+  avatarId: "relay-scout",
+  soundEnabled: true,
+  streakDays: 0,
+  lastActiveDate: "",
+  dailyDate: "",
+  dailyTopics: 0,
+  dailyLabs: 0,
+  dailyClaimed: false,
+  inventory: ["Signal Compass"],
+  updatedAt: 0,
 };
 
 export const DEFAULT_PROGRESS: PlayerProgress = {
@@ -16,6 +44,7 @@ export const DEFAULT_PROGRESS: PlayerProgress = {
   completed: Object.fromEntries(PROGRESS_KEYS.map((key) => [key, []])),
   coding: Object.fromEntries(PROGRESS_KEYS.map((key) => [key, []])),
   bonus: Object.fromEntries(PROGRESS_KEYS.map((key) => [key, []])),
+  game: DEFAULT_GAME_PROFILE,
 };
 
 function cleanIds(value: unknown): number[] {
@@ -28,6 +57,25 @@ function cleanBucket(value: unknown): Record<string, number[]> {
   return Object.fromEntries(PROGRESS_KEYS.map((key) => [key, cleanIds(source[key])]));
 }
 
+function cleanGame(value: unknown): GameProfile {
+  const source = value && typeof value === "object" ? value as Partial<GameProfile> : {};
+  const avatarId: AvatarId = source.avatarId === "signal-mage" || source.avatarId === "core-runner" ? source.avatarId : "relay-scout";
+  return {
+    avatarId,
+    soundEnabled: source.soundEnabled !== false,
+    streakDays: Number.isInteger(source.streakDays) ? Math.max(0, Math.min(10_000, Number(source.streakDays))) : 0,
+    lastActiveDate: typeof source.lastActiveDate === "string" ? source.lastActiveDate.slice(0, 10) : "",
+    dailyDate: typeof source.dailyDate === "string" ? source.dailyDate.slice(0, 10) : "",
+    dailyTopics: Number.isInteger(source.dailyTopics) ? Math.max(0, Math.min(100, Number(source.dailyTopics))) : 0,
+    dailyLabs: Number.isInteger(source.dailyLabs) ? Math.max(0, Math.min(100, Number(source.dailyLabs))) : 0,
+    dailyClaimed: source.dailyClaimed === true,
+    inventory: Array.isArray(source.inventory)
+      ? [...new Set(source.inventory.filter((item): item is string => typeof item === "string" && item.length > 0 && item.length <= 80))].slice(0, 100)
+      : [...DEFAULT_GAME_PROFILE.inventory],
+    updatedAt: typeof source.updatedAt === "number" && Number.isFinite(source.updatedAt) ? Math.max(0, Math.floor(source.updatedAt)) : 0,
+  };
+}
+
 export function normalizeProgress(value: unknown): PlayerProgress {
   const source = value && typeof value === "object" ? value as Partial<PlayerProgress> : {};
   const xp = typeof source.xp === "number" && Number.isFinite(source.xp)
@@ -38,16 +86,29 @@ export function normalizeProgress(value: unknown): PlayerProgress {
     completed: cleanBucket(source.completed),
     coding: cleanBucket(source.coding),
     bonus: cleanBucket(source.bonus),
+    game: cleanGame(source.game),
   };
 }
 
 export function mergeProgress(local: PlayerProgress, cloud: PlayerProgress): PlayerProgress {
   const mergeBucket = (left: Record<string, number[]>, right: Record<string, number[]>) =>
     Object.fromEntries(PROGRESS_KEYS.map((key) => [key, cleanIds([...(left[key] ?? []), ...(right[key] ?? [])])]));
+  const localGame = cleanGame(local.game);
+  const cloudGame = cleanGame(cloud.game);
+  const newestGame = localGame.updatedAt >= cloudGame.updatedAt ? localGame : cloudGame;
+  const sameDailyDate = localGame.dailyDate && localGame.dailyDate === cloudGame.dailyDate;
   return {
     xp: Math.max(local.xp, cloud.xp),
     completed: mergeBucket(local.completed, cloud.completed),
     coding: mergeBucket(local.coding, cloud.coding),
     bonus: mergeBucket(local.bonus, cloud.bonus),
+    game: {
+      ...newestGame,
+      streakDays: Math.max(localGame.streakDays, cloudGame.streakDays),
+      dailyTopics: sameDailyDate ? Math.max(localGame.dailyTopics, cloudGame.dailyTopics) : newestGame.dailyTopics,
+      dailyLabs: sameDailyDate ? Math.max(localGame.dailyLabs, cloudGame.dailyLabs) : newestGame.dailyLabs,
+      dailyClaimed: sameDailyDate ? localGame.dailyClaimed || cloudGame.dailyClaimed : newestGame.dailyClaimed,
+      inventory: [...new Set([...localGame.inventory, ...cloudGame.inventory])],
+    },
   };
 }
