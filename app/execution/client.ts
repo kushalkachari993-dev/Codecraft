@@ -1,61 +1,149 @@
-import type { ExecutionRequest, ExecutionResult, WorkerExecutionRequest, WorkerExecutionResponse } from "./types";
+import type { ExecutionRequest, ExecutionResult, RuntimeProgress, RuntimeWorkerTrack, WorkerExecutionRequest, WorkerExecutionResponse } from "./types";
 
 let requestId = 0;
+const COLD_START_TIMEOUT = { python: 90_000, sql: 90_000 } satisfies Record<RuntimeWorkerTrack, number>;
+const EXECUTION_TIMEOUT = { python: 30_000, sql: 30_000 } satisfies Record<RuntimeWorkerTrack, number>;
 
-function runWorker(worker: Worker, code: string, challenge: ExecutionRequest["challenge"], timeoutMs: number, signal?: AbortSignal): Promise<ExecutionResult> {
+type RuntimePool = {
+  worker: Worker | null;
+  ready: boolean;
+  preparing: Promise<void> | null;
+};
+
+const runtimePools: Record<RuntimeWorkerTrack, RuntimePool> = {
+  python: { worker: null, ready: false, preparing: null },
+  sql: { worker: null, ready: false, preparing: null },
+};
+
+function createRuntimeWorker(track: RuntimeWorkerTrack) {
+  return track === "python"
+    ? new Worker(new URL("./python-runner.worker.ts", import.meta.url), { type: "module" })
+    : new Worker(new URL("./sql-runner.worker.ts", import.meta.url), { type: "module" });
+}
+
+function getRuntimeWorker(track: RuntimeWorkerTrack) {
+  const pool = runtimePools[track];
+  pool.worker ??= createRuntimeWorker(track);
+  return pool.worker;
+}
+
+export function resetLabRuntime(track?: RuntimeWorkerTrack) {
+  const tracks: RuntimeWorkerTrack[] = track ? [track] : ["python", "sql"];
+  for (const runtimeTrack of tracks) {
+    runtimePools[runtimeTrack].worker?.terminate();
+    runtimePools[runtimeTrack].worker = null;
+    runtimePools[runtimeTrack].ready = false;
+    runtimePools[runtimeTrack].preparing = null;
+  }
+}
+
+function sendWorkerRequest(
+  track: RuntimeWorkerTrack,
+  request: Omit<WorkerExecutionRequest, "id">,
+  timeoutMs: number,
+  onProgress?: (progress: RuntimeProgress) => void,
+  signal?: AbortSignal,
+): Promise<ExecutionResult | null> {
   const id = ++requestId;
+  const worker = getRuntimeWorker(track);
 
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (result: ExecutionResult) => {
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      worker.removeEventListener("message", onMessage);
+      worker.removeEventListener("error", onError);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const finish = (result: ExecutionResult | null, reset = false) => {
       if (settled) return;
       settled = true;
-      window.clearTimeout(timeout);
-      worker.terminate();
+      cleanup();
+      if (reset) resetLabRuntime(track);
       resolve(result);
     };
     const timeout = window.setTimeout(() => {
       finish({
         passed: false,
         stdout: "",
-        error: "Execution stopped after reaching the safe time limit.",
+        error: request.type === "prepare"
+          ? "The browser runtime took too long to prepare. Check your connection, disable blockers for this site, then try again."
+          : "Execution stopped after reaching the safe time limit.",
         runtime: "controlled-local",
         durationMs: timeoutMs,
         tests: [],
-      });
+      }, true);
     }, timeoutMs);
 
-    worker.addEventListener("message", function onMessage(event: MessageEvent<WorkerExecutionResponse>) {
+    function onMessage(event: MessageEvent<WorkerExecutionResponse>) {
       if (event.data.id !== id) return;
-      worker.removeEventListener("message", onMessage);
-      const { id: _id, ...result } = event.data;
+      if (event.data.type === "progress") {
+        onProgress?.({ phase: event.data.phase, detail: event.data.detail });
+        return;
+      }
+      if (event.data.type === "ready") {
+        finish(null);
+        return;
+      }
+      const { id: _id, type: _type, ...result } = event.data;
       void _id;
+      void _type;
       finish(result);
-    });
-    worker.addEventListener("error", () => finish({
-      passed: false,
-      stdout: "",
-      error: "The isolated runtime could not start. Reset the lab and try again.",
-      runtime: "controlled-local",
-      durationMs: 0,
-      tests: [],
-    }), { once: true });
-    signal?.addEventListener("abort", () => finish({
-      passed: false,
-      stdout: "",
-      error: "Execution stopped by the learner.",
-      runtime: "controlled-local",
-      durationMs: 0,
-      tests: [],
-    }), { once: true });
+    }
+    function onError() {
+      finish({
+        passed: false,
+        stdout: "",
+        error: "The isolated runtime could not start. Check your browser console or reset the runtime and try again.",
+        runtime: "controlled-local",
+        durationMs: 0,
+        tests: [],
+      }, true);
+    }
+    function onAbort() {
+      finish({
+        passed: false,
+        stdout: "",
+        error: "Execution stopped by the learner.",
+        runtime: "controlled-local",
+        durationMs: 0,
+        tests: [],
+      }, true);
+    }
+    worker.addEventListener("message", onMessage);
+    worker.addEventListener("error", onError);
+    signal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted) {
-      finish({ passed: false, stdout: "", error: "Execution stopped by the learner.", runtime: "controlled-local", durationMs: 0, tests: [] });
+      onAbort();
       return;
     }
 
-    const workerRequest: WorkerExecutionRequest = { id, code, challenge };
+    const workerRequest = { ...request, id } as WorkerExecutionRequest;
     worker.postMessage(workerRequest);
   });
+}
+
+export function prepareLabRuntime(
+  track: RuntimeWorkerTrack,
+  onProgress?: (progress: RuntimeProgress) => void,
+  signal?: AbortSignal,
+) {
+  const pool = runtimePools[track];
+  if (pool.ready) {
+    onProgress?.({ phase: "ready", detail: track === "python" ? "Python runtime ready." : "PostgreSQL runtime ready." });
+    return Promise.resolve();
+  }
+  if (pool.preparing) return pool.preparing;
+
+  pool.preparing = sendWorkerRequest(track, { type: "prepare" }, COLD_START_TIMEOUT[track], onProgress, signal)
+    .then((failure) => {
+      if (failure) throw new Error(failure.error ?? "Runtime preparation failed.");
+      pool.ready = true;
+    })
+    .finally(() => {
+      pool.preparing = null;
+    });
+  return pool.preparing;
 }
 
 async function runGenAILab(request: ExecutionRequest, signal?: AbortSignal): Promise<ExecutionResult> {
@@ -95,10 +183,16 @@ async function runGenAILab(request: ExecutionRequest, signal?: AbortSignal): Pro
   }
 }
 
-export function executeLab(request: ExecutionRequest, signal?: AbortSignal): Promise<ExecutionResult> {
+export async function executeLab(request: ExecutionRequest, signal?: AbortSignal, onProgress?: (progress: RuntimeProgress) => void): Promise<ExecutionResult> {
   if (request.track === "genai") return runGenAILab(request, signal);
-  const worker = request.track === "python"
-    ? new Worker(new URL("./python-runner.worker.ts", import.meta.url), { type: "module" })
-    : new Worker(new URL("./sql-runner.worker.ts", import.meta.url), { type: "module" });
-  return runWorker(worker, request.code, request.challenge, request.track === "python" ? 20_000 : 12_000, signal);
+  await prepareLabRuntime(request.track, onProgress, signal);
+  const result = await sendWorkerRequest(
+    request.track,
+    { type: "execute", code: request.code, challenge: request.challenge },
+    EXECUTION_TIMEOUT[request.track],
+    onProgress,
+    signal,
+  );
+  if (!result) throw new Error("The runtime returned no execution result.");
+  return result;
 }

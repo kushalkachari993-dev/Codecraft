@@ -213,7 +213,14 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(challenges, /VISIBLE EXAMPLE/);
   assert.match(executionClient, /python-runner\.worker\.ts/);
   assert.match(executionClient, /sql-runner\.worker\.ts/);
+  assert.match(executionClient, /runtimePools/);
+  assert.match(executionClient, /prepareLabRuntime/);
+  assert.match(executionClient, /COLD_START_TIMEOUT/);
+  assert.match(page, /RUNTIME READY/);
+  assert.match(page, /warmed worker/);
   assert.match(pythonRunner, /loadPyodide/);
+  assert.match(pythonRunner, /Creating a clean Python workspace/);
+  assert.match(sqlRunner, /Reusing the warmed PostgreSQL runtime/);
   assert.match(pythonRunner, /runPythonAsync/);
   assert.match(pythonRunner, /Hidden behavior check passed/);
   assert.match(sqlRunner, /PGlite\.create\("memory:\/\/"\)/);

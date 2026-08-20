@@ -5,12 +5,13 @@ import { SignInButton, useAuth, useClerk, useUser } from "@clerk/react";
 import { PYTHON_PACES, type PythonPaceId, type PythonTopic } from "./python-curriculum";
 import { GENAI_PACES, buildGenAILab, validateGenAILab, type GenAIPaceId, type GenAITopic } from "./genai-curriculum";
 import { SQL_PACES, type SQLPaceId, type SQLTopic } from "./sql-curriculum";
-import { executeLab } from "./execution/client";
+import { executeLab, prepareLabRuntime } from "./execution/client";
 import { buildPythonChallenge, buildSQLChallenge } from "./challenges";
-import type { ExecutionResult } from "./execution/types";
+import type { ExecutionResult, RuntimeProgress, RuntimeWorkerTrack } from "./execution/types";
 import { DEFAULT_PROGRESS, mergeProgress, normalizeProgress, type AvatarId, type PlayerProgress } from "./progress";
 
 type RunState = "idle" | "running" | "ready" | "error" | "complete";
+type RuntimeReadiness = "idle" | "preparing" | "ready" | "error";
 type View = "tracks" | "paces" | "roadmap" | "quest";
 type LessonStage = "theory" | "example" | "quiz" | "bonus";
 
@@ -406,6 +407,7 @@ export default function Home() {
   const executionAbort = useRef<AbortController | null>(null);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [executionPhase, setExecutionPhase] = useState("");
+  const [runtimeReadiness, setRuntimeReadiness] = useState<Record<RuntimeWorkerTrack, RuntimeReadiness>>({ python: "idle", sql: "idle" });
   const [cloudUser, setCloudUser] = useState<CloudUser | null>(null);
   const [cloudState, setCloudState] = useState<CloudState>("checking");
   const [progressReady, setProgressReady] = useState(false);
@@ -812,6 +814,28 @@ export default function Home() {
     setExecutionResult(null);
   };
 
+  const updateRuntimeReadiness = (track: RuntimeWorkerTrack, readiness: RuntimeReadiness) => {
+    setRuntimeReadiness((current) => ({ ...current, [track]: readiness }));
+  };
+
+  const warmExecutionRuntime = (track: Track["id"]) => {
+    if (track === "genai") return;
+    updateRuntimeReadiness(track, "preparing");
+    setExecutionPhase(track === "python"
+      ? "Downloading and compiling Python once for this browser tab…"
+      : "Downloading and compiling PostgreSQL once for this browser tab…");
+    void prepareLabRuntime(track, (progress: RuntimeProgress) => {
+      setExecutionPhase(progress.detail);
+      if (progress.phase === "ready") updateRuntimeReadiness(track, "ready");
+    }).then(() => {
+      updateRuntimeReadiness(track, "ready");
+      setExecutionPhase(track === "python" ? "Python runtime ready." : "PostgreSQL runtime ready.");
+    }).catch(() => {
+      updateRuntimeReadiness(track, "error");
+      setExecutionPhase("Runtime preparation paused. Run the lab to retry.");
+    });
+  };
+
   const selectTrack = (track: Track) => {
     clearRun();
     setActiveTrackId(track.id);
@@ -894,6 +918,7 @@ export default function Home() {
       setTerminal(projectComplete ? "> Applied project already complete\n✓ Your project XP is saved." : "Required world project ready. Pass every hidden check to unlock the next world.");
       setSceneStep(projectComplete ? quest.steps : 0);
       setLessonStage("bonus");
+      warmExecutionRuntime(activeTrack.id);
     } else {
       setCode(quest.starterCode);
       setStatus(trackCompleted.includes(quest.id) ? "complete" : "idle");
@@ -936,19 +961,36 @@ export default function Home() {
     }
     setStatus("running");
     setExecutionResult(null);
+    if (activeTrack.id !== "genai") updateRuntimeReadiness(activeTrack.id, "preparing");
     setExecutionPhase(activeGenAILab ? "Evaluating grounding, tools, safety, and output quality…" : activeTrack.id === "sql" ? "Resetting and loading the topic-specific practice database…" : "Loading the Python runtime in an isolated worker… First run may take a few seconds.");
     setTerminal(activeGenAILab ? "> Contacting the controlled AI evaluator…" : activeTrack.id === "sql" ? "> Starting isolated PostgreSQL practice database…" : "> Starting isolated Python runtime…");
     setSceneStep(0);
-    const result = await executeLab({
-      track: activeTrack.id,
-      code,
-      topic: activeQuest.concept,
-      required: isRequiredWorldProject,
-      challenge: activeChallenge?.runtime,
-    }, controller.signal);
+    let result: ExecutionResult;
+    try {
+      result = await executeLab({
+        track: activeTrack.id,
+        code,
+        topic: activeQuest.concept,
+        required: isRequiredWorldProject,
+        challenge: activeChallenge?.runtime,
+      }, controller.signal, (runtimeProgress) => {
+        setExecutionPhase(runtimeProgress.detail);
+        if (activeTrack.id !== "genai" && runtimeProgress.phase === "ready") updateRuntimeReadiness(activeTrack.id, "ready");
+      });
+    } catch (error) {
+      result = {
+        passed: false,
+        stdout: "",
+        error: error instanceof Error ? error.message : "The browser runtime could not start.",
+        runtime: "controlled-local",
+        durationMs: 0,
+        tests: [],
+      };
+    }
     if (currentRun !== runToken.current) return;
     executionAbort.current = null;
     setExecutionPhase("");
+    if (activeTrack.id !== "genai") updateRuntimeReadiness(activeTrack.id, result.runtime === "controlled-local" ? "error" : "ready");
     setExecutionResult(result);
     saveSubmission(result, "attempt");
 
@@ -977,6 +1019,7 @@ export default function Home() {
     executionAbort.current?.abort();
     executionAbort.current = null;
     setExecutionPhase("");
+    if (activeTrack.id !== "genai") updateRuntimeReadiness(activeTrack.id, "idle");
     setStatus("idle");
     setTerminal("> Execution stopped by learner.\nEdit or reset the lab when you are ready.");
   };
@@ -1024,6 +1067,7 @@ export default function Home() {
           : isRequiredWorldProject ? "Required Python project ready. Build the relay report and pass every hidden test." : "Python sandbox ready. Run real Python directly in your browser.");
     setSceneStep(trackBonus.includes(activeQuest.id) ? activeQuest.steps : 0);
     setLessonStage("bonus");
+    warmExecutionRuntime(activeTrack.id);
   };
 
   const submitBonus = () => {
@@ -1513,9 +1557,15 @@ export default function Home() {
             <section className="coding-station">
               <div className="editor-topbar">
                 <div><span className="file-dot">◆</span><strong>{activeGenAILab?.fileName ?? (activeTrack.id === "sql" ? "query.sql" : "main.py")}</strong></div>
-                <button onClick={openBonus}>↺ {activeTrack.id === "sql" ? "Reset database & code" : "Reset lab"}</button>
+                <button onClick={openBonus}>↺ {activeTrack.id === "sql" ? "Reset database & code" : activeTrack.id === "python" ? "Reset code" : "Reset lab"}</button>
               </div>
-              <div className="snippet-tray bonus-tray">{activeGenAILab ? "CONTROLLED AI RUNTIME · approved model, tools, and token budget" : activeTrack.id === "sql" ? "REAL POSTGRESQL · fresh seeded practice database on every run" : "REAL PYTHON · isolated browser worker with a safe time limit"}</div>
+              <div className="snippet-tray bonus-tray">{activeGenAILab ? "CONTROLLED AI RUNTIME · approved model, tools, and token budget" : activeTrack.id === "sql" ? "REAL POSTGRESQL · warmed worker, fresh seeded database on every run" : "REAL PYTHON · warmed isolated browser worker with clean state per run"}</div>
+              {activeTrack.id !== "genai" && status !== "running" && runtimeReadiness[activeTrack.id] !== "idle" && (
+                <div className={`runtime-loader runtime-${runtimeReadiness[activeTrack.id]}`} role="status" aria-live="polite">
+                  <i />
+                  <span><strong>{runtimeReadiness[activeTrack.id] === "ready" ? "RUNTIME READY" : runtimeReadiness[activeTrack.id] === "error" ? "PRELOAD PAUSED" : activeTrack.id === "python" ? "PREPARING PYTHON" : "PREPARING DATABASE"}</strong>{executionPhase}</span>
+                </div>
+              )}
               {status === "running" && <div className="runtime-loader" role="status" aria-live="polite"><i /><span><strong>{activeTrack.id === "python" ? "PREPARING PYTHON" : activeTrack.id === "sql" ? "PREPARING DATABASE" : "EVALUATING LAB"}</strong>{executionPhase}</span></div>}
               <div className={`code-window ${status === "error" ? "has-error" : ""}`}>
                 <div className="line-numbers" aria-hidden="true">{code.split("\n").map((_, index) => <span key={index}>{index + 1}</span>)}</div>

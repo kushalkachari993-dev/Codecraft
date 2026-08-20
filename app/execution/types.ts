@@ -52,10 +52,18 @@ export type ExecutionResult = {
   table?: ResultTable;
 };
 
-export type WorkerExecutionRequest = {
-  id: number;
-  code: string;
-  challenge?: ChallengeRuntimeSpec;
+export type RuntimeWorkerTrack = Extract<ExecutionTrack, "python" | "sql">;
+
+export type RuntimeProgress = {
+  phase: "download" | "initialize" | "database" | "execute" | "test" | "ready";
+  detail: string;
 };
 
-export type WorkerExecutionResponse = ExecutionResult & { id: number };
+export type WorkerExecutionRequest =
+  | { type: "prepare"; id: number }
+  | { type: "execute"; id: number; code: string; challenge?: ChallengeRuntimeSpec };
+
+export type WorkerExecutionResponse =
+  | ({ type: "progress"; id: number } & RuntimeProgress)
+  | { type: "ready"; id: number; runtime: "python-wasm" | "postgres-wasm" }
+  | (ExecutionResult & { type: "result"; id: number });

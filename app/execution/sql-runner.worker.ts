@@ -5,6 +5,28 @@ import type { ChallengeTestResult, ResultTable, WorkerExecutionRequest, WorkerEx
 
 declare const self: DedicatedWorkerGlobalScope;
 
+let runtimePromise: Promise<void> | null = null;
+
+function report(id: number, phase: "download" | "initialize" | "database" | "execute" | "test" | "ready", detail: string) {
+  self.postMessage({ type: "progress", id, phase, detail } satisfies WorkerExecutionResponse);
+}
+
+function prepareRuntime(id: number) {
+  if (!runtimePromise) {
+    report(id, "download", "Downloading PostgreSQL runtime files (about 17 MB)…");
+    runtimePromise = (async () => {
+      const warmup = await PGlite.create("memory://");
+      await warmup.close();
+    })().catch((error) => {
+      runtimePromise = null;
+      throw error;
+    });
+  } else {
+    report(id, "initialize", "Reusing the warmed PostgreSQL runtime…");
+  }
+  return runtimePromise;
+}
+
 const PRACTICE_SCHEMA = `
 CREATE TABLE sectors (sector_id bigint PRIMARY KEY, name text NOT NULL, region text NOT NULL);
 CREATE TABLE relays (
@@ -128,19 +150,32 @@ async function gradeSQL(database: PGlite, code: string, table: ResultTable | und
 }
 
 self.onmessage = async (event: MessageEvent<WorkerExecutionRequest>) => {
-  const { id, code } = event.data;
+  const { id } = event.data;
   const startedAt = performance.now();
   let database: PGlite | null = null;
 
   try {
+    await prepareRuntime(id);
+    if (event.data.type === "prepare") {
+      report(id, "ready", "PostgreSQL runtime ready. Each run gets a fresh practice database.");
+      self.postMessage({ type: "ready", id, runtime: "postgres-wasm" } satisfies WorkerExecutionResponse);
+      return;
+    }
+
+    const { code } = event.data;
+    report(id, "database", "Creating a fresh in-memory practice database…");
     database = await PGlite.create("memory://");
+    report(id, "database", "Loading the topic-specific tables and sample data…");
     await database.exec(PRACTICE_SCHEMA);
     if (event.data.challenge?.sqlSetup) await database.exec(event.data.challenge.sqlSetup);
+    report(id, "execute", "Running your SQL statements…");
     const results = await database.exec(code) as QueryResult[];
     const visibleResult = [...results].reverse().find((result) => result.rows);
     const table = resultTable(visibleResult);
+    report(id, "test", "Checking result rows and database state…");
     const tests = await gradeSQL(database, code, table, event.data);
     const response: WorkerExecutionResponse = {
+      type: "result",
       id,
       passed: tests.every((test) => test.passed),
       stdout: table ? "Query completed successfully and returned " + table.rows.length + " structured row" + (table.rows.length === 1 ? "." : "s.") : formatResults(results),
@@ -152,6 +187,7 @@ self.onmessage = async (event: MessageEvent<WorkerExecutionRequest>) => {
     self.postMessage(response);
   } catch (error) {
     const response: WorkerExecutionResponse = {
+      type: "result",
       id,
       passed: false,
       stdout: "",
