@@ -16,8 +16,9 @@ const runtimePools: Record<RuntimeWorkerTrack, RuntimePool> = {
 };
 
 function createRuntimeWorker(track: RuntimeWorkerTrack) {
+  // The bundled python-runner.worker.ts entry is avoided because hosted module-worker URLs can be blocked before startup.
   return track === "python"
-    ? new Worker(new URL("./python-runner.worker.ts", import.meta.url), { type: "module" })
+    ? new Worker("/python-runner.js", { name: "codecraft-python-runtime" })
     : new Worker(new URL("./sql-runner.worker.ts", import.meta.url), { type: "module" });
 }
 
@@ -135,7 +136,15 @@ export function prepareLabRuntime(
   }
   if (pool.preparing) return pool.preparing;
 
-  pool.preparing = sendWorkerRequest(track, { type: "prepare" }, COLD_START_TIMEOUT[track], onProgress, signal)
+  let preparation: Promise<ExecutionResult | null>;
+  try {
+    preparation = sendWorkerRequest(track, { type: "prepare" }, COLD_START_TIMEOUT[track], onProgress, signal);
+  } catch (error) {
+    resetLabRuntime(track);
+    return Promise.reject(error instanceof Error ? error : new Error("The browser blocked the runtime worker."));
+  }
+
+  pool.preparing = preparation
     .then((failure) => {
       if (failure) throw new Error(failure.error ?? "Runtime preparation failed.");
       pool.ready = true;

@@ -6,6 +6,7 @@ const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const sourceRoot = join(projectRoot, "node_modules", "pyodide");
 const outputRoot = join(projectRoot, "public", "pyodide");
 const runtimeFiles = [
+  "pyodide.mjs",
   "pyodide.asm.mjs",
   "pyodide.asm.wasm",
   "pyodide-lock.json",

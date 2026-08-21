@@ -214,6 +214,7 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(executionClient, /python-runner\.worker\.ts/);
   assert.match(executionClient, /sql-runner\.worker\.ts/);
   assert.match(executionClient, /runtimePools/);
+  assert.match(executionClient, /python-runner[.]js/);
   assert.match(executionClient, /prepareLabRuntime/);
   assert.match(executionClient, /COLD_START_TIMEOUT/);
   assert.match(page, /RUNTIME READY/);
