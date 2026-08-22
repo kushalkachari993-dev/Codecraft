@@ -80,7 +80,7 @@ test("renders the privacy notice", async () => {
 });
 
 test("keeps the finished product free of starter-preview code", async () => {
-  const [page, layout, packageJson, pythonCurriculum, genaiCurriculum, sqlCurriculum, challenges, executionClient, pythonRunner, sqlRunner, worker, progressSource, progressRoute, submissionsRoute, schema, clerkAuth, clerkProvider, accountRoute, healthRoute, privacyPage, deleteAccountPage, migration] = await Promise.all([
+  const [page, layout, packageJson, pythonCurriculum, genaiCurriculum, sqlCurriculum, challenges, executionClient, pythonRunner, sqlRunner, worker, progressSource, progressRoute, submissionsRoute, schema, clerkAuth, clerkProvider, accountRoute, healthRoute, privacyPage, deleteAccountPage, migration, workerUrlNormalizer] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -103,6 +103,7 @@ test("keeps the finished product free of starter-preview code", async () => {
     readFile(new URL("../app/privacy/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/account/delete/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0001_warm_edwin_jarvis.sql", import.meta.url), "utf8"),
+    readFile(new URL("../scripts/normalize-worker-urls.mjs", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /const TRACKS: Track\[\]/);
@@ -241,7 +242,10 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(challenges, /database-value/);
   assert.match(challenges, /VISIBLE EXAMPLE/);
   assert.match(executionClient, /python-runner[.]js[\s\S]*type: "module"/);
-  assert.match(executionClient, /sql-runner\.worker\?worker&url/);
+  assert.match(executionClient, /sql-runner\.worker\.ts/);
+  assert.match(packageJson, /normalize-worker-urls\.mjs/);
+  assert.match(workerUrlNormalizer, /file:\\\/\\\/\\\//);
+  assert.match(workerUrlNormalizer, /replacements !== 1/);
   assert.match(executionClient, /runtimePools/);
   assert.match(executionClient, /python-runner[.]js/);
   assert.match(executionClient, /prepareLabRuntime/);

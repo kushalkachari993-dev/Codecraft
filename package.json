@@ -9,7 +9,7 @@
     "predev": "node scripts/sync-runtime-assets.mjs",
     "dev": "node scripts/run-vinext.mjs dev",
     "prebuild": "node scripts/sync-runtime-assets.mjs",
-    "build": "node scripts/run-vinext.mjs build",
+    "build": "node scripts/run-vinext.mjs build && node scripts/normalize-worker-urls.mjs",
     "start": "node scripts/run-vinext.mjs start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern public/pyodide",
