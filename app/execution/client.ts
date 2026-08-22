@@ -16,9 +16,10 @@ const runtimePools: Record<RuntimeWorkerTrack, RuntimePool> = {
 };
 
 function createRuntimeWorker(track: RuntimeWorkerTrack) {
-  // The bundled python-runner.worker.ts entry is avoided because hosted module-worker URLs can be blocked before startup.
+  // Keep Python on a stable same-origin URL while using the module-worker form
+  // required by the hosted browser environment (and by its dynamic import).
   return track === "python"
-    ? new Worker("/python-runner.js", { name: "codecraft-python-runtime" })
+    ? new Worker("/python-runner.js", { name: "codecraft-python-runtime", type: "module" })
     : new Worker(new URL("./sql-runner.worker.ts", import.meta.url), { type: "module" });
 }
 
