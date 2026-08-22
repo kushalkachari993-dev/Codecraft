@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const learners = sqliteTable("learners", {
   userId: text("user_id").primaryKey(),
@@ -30,4 +30,13 @@ export const codeSubmissions = sqliteTable("code_submissions", {
 }, (table) => [
   index("code_submissions_user_topic_idx").on(table.userId, table.track, table.pace, table.topicId),
   index("code_submissions_user_created_idx").on(table.userId, table.createdAt),
+]);
+
+export const aiReviewUsage = sqliteTable("ai_review_usage", {
+  userId: text("user_id").notNull().references(() => learners.userId, { onDelete: "cascade" }),
+  usageDate: text("usage_date").notNull(),
+  reviewCount: integer("review_count").notNull().default(0),
+  updatedAt: integer("updated_at").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.usageDate] }),
 ]);

@@ -967,10 +967,12 @@ export default function Home() {
     setSceneStep(0);
     let result: ExecutionResult;
     try {
+      const authToken = activeGenAILab && clerkSignedIn ? await getToken() ?? undefined : undefined;
       result = await executeLab({
         track: activeTrack.id,
         code,
         topic: activeQuest.concept,
+        authToken,
         required: isRequiredWorldProject,
         challenge: activeChallenge?.runtime,
       }, controller.signal, (runtimeProgress) => {
@@ -1222,12 +1224,14 @@ export default function Home() {
               {clerkSignedIn ? (
                 <>
                   <button onClick={() => { closeProfile(); clerk.openUserProfile(); }}>Manage Clerk account</button>
+                  <a href="/account/delete">Delete account</a>
                   <button className="sign-out-button" onClick={() => { closeProfile(); void clerk.signOut({ redirectUrl: "/" }); }}>Sign out</button>
                 </>
               ) : (
                 <SignInButton mode="modal"><button onClick={closeProfile}>Sign in to sync and edit name</button></SignInButton>
               )}
             </footer>
+            <div className="profile-policy-links"><a href="/privacy">Privacy</a><span>·</span><a href="/api/health">Service status</a></div>
           </section>
         </div>
       )}
@@ -1559,7 +1563,7 @@ export default function Home() {
                 <div><span className="file-dot">◆</span><strong>{activeGenAILab?.fileName ?? (activeTrack.id === "sql" ? "query.sql" : "main.py")}</strong></div>
                 <button onClick={openBonus}>↺ {activeTrack.id === "sql" ? "Reset database & code" : activeTrack.id === "python" ? "Reset code" : "Reset lab"}</button>
               </div>
-              <div className="snippet-tray bonus-tray">{activeGenAILab ? "CONTROLLED AI RUNTIME · approved model, tools, and token budget" : activeTrack.id === "sql" ? "REAL POSTGRESQL · warmed worker, fresh seeded database on every run" : "REAL PYTHON · warmed isolated browser worker with clean state per run"}</div>
+              <div className="snippet-tray bonus-tray">{activeGenAILab ? "CONTROLLED AI RUNTIME · deterministic checks unlimited · 3 signed-in AI coaching reviews daily" : activeTrack.id === "sql" ? "REAL POSTGRESQL · warmed worker, fresh seeded database on every run" : "REAL PYTHON · warmed isolated browser worker with clean state per run"}</div>
               {activeTrack.id !== "genai" && status !== "running" && runtimeReadiness[activeTrack.id] !== "idle" && (
                 <div className={`runtime-loader runtime-${runtimeReadiness[activeTrack.id]}`} role="status" aria-live="polite">
                   <i />

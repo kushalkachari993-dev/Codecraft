@@ -2,6 +2,9 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { GENAI_PACES, buildGenAILab, validateGenAILab } from "../app/genai-curriculum";
+import { getClerkUser } from "../app/clerk-auth";
+import type { ClerkRuntimeEnvironment } from "../app/clerk-config";
+import { ensureProgressSchema } from "../db/runtime";
 import type { ChallengeTestResult } from "../app/execution/types";
 
 type AIResponse = string | { response?: string };
@@ -14,7 +17,7 @@ interface AIBinding {
   }): Promise<AIResponse>;
 }
 
-interface Env {
+interface Env extends ClerkRuntimeEnvironment {
   ASSETS: Fetcher;
   DB: D1Database;
   AI?: AIBinding;
@@ -28,7 +31,8 @@ interface Env {
 }
 
 const requestWindows = new Map<string, { count: number; resetAt: number }>();
-const MODEL_ID = "@cf/meta/llama-3.1-8b-instruct";
+const MODEL_ID = "@cf/meta/llama-3.1-8b-instruct-fp8-fast";
+const AI_REVIEW_DAILY_LIMIT = 3;
 
 function takeGenAIRequest(request: Request) {
   const now = Date.now();
@@ -56,6 +60,36 @@ function buildGenAIRubric(requiredCalls: string[], code: string): ChallengeTestR
   ];
 }
 
+function controlledEvaluation(passed: boolean, reason: string) {
+  return [
+    "Controlled evaluator",
+    "Result: " + (passed ? "PASS" : "NEEDS WORK"),
+    "Evidence: " + reason,
+    passed
+      ? "One improvement: Explain why the chosen workflow satisfies the lab criteria."
+      : "One improvement: Resolve the failed rubric checks before requesting model feedback.",
+  ].join("\n");
+}
+
+async function reserveAIReview(env: Env, user: NonNullable<Awaited<ReturnType<typeof getClerkUser>>>) {
+  await ensureProgressSchema(env.DB);
+  const now = Date.now();
+  const usageDate = new Date(now).toISOString().slice(0, 10);
+  await env.DB.prepare(
+    "INSERT INTO learners (user_id, email, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET email = excluded.email, display_name = excluded.display_name, updated_at = excluded.updated_at",
+  ).bind(user.userId, user.email, user.displayName, now, now).run();
+  const row = await env.DB.prepare(
+    "INSERT INTO ai_review_usage (user_id, usage_date, review_count, updated_at) VALUES (?, ?, 1, ?) ON CONFLICT(user_id, usage_date) DO UPDATE SET review_count = ai_review_usage.review_count + 1, updated_at = excluded.updated_at WHERE ai_review_usage.review_count < ? RETURNING review_count",
+  ).bind(user.userId, usageDate, now, AI_REVIEW_DAILY_LIMIT).first<{ review_count: number }>();
+  return row ? { usageDate, count: Number(row.review_count) } : null;
+}
+
+async function releaseAIReview(env: Env, userId: string, usageDate: string) {
+  await env.DB.prepare(
+    "UPDATE ai_review_usage SET review_count = MAX(0, review_count - 1), updated_at = ? WHERE user_id = ? AND usage_date = ?",
+  ).bind(Date.now(), userId, usageDate).run();
+}
+
 async function handleGenAILab(request: Request, env: Env) {
   if (request.method !== "POST") return Response.json({ error: "Method not allowed." }, { status: 405 });
   if (!takeGenAIRequest(request)) return Response.json({ error: "Lab rate limit reached. Try again in one minute." }, { status: 429 });
@@ -77,9 +111,49 @@ async function handleGenAILab(request: Request, env: Env) {
     const tests = buildGenAIRubric(lab.requiredCalls, code);
     const passed = tests.every((test) => test.passed);
 
-    if (env.AI) {
-      try {
-        const modelResponse = await env.AI.run(MODEL_ID, {
+    if (!passed) {
+      return Response.json({
+        output: lab.mockOutput + "\n\n" + controlledEvaluation(false, "One or more deterministic rubric checks failed."),
+        mode: "controlled-local",
+        passed,
+        tests,
+      }, { headers: { "cache-control": "no-store" } });
+    }
+
+    const user = await getClerkUser(request, env);
+    if (!user) {
+      return Response.json({
+        output: lab.mockOutput + "\n\n" + controlledEvaluation(true, "The deterministic rubric passed. Sign in to request one of three daily AI coaching reviews."),
+        mode: "controlled-local",
+        passed,
+        tests,
+        reviewsRemaining: null,
+      }, { headers: { "cache-control": "no-store" } });
+    }
+
+    if (!env.AI) {
+      return Response.json({
+        output: lab.mockOutput + "\n\n" + controlledEvaluation(true, "The deterministic rubric passed. Hosted AI coaching is not enabled on this deployment."),
+        mode: "controlled-local",
+        passed,
+        tests,
+        reviewsRemaining: AI_REVIEW_DAILY_LIMIT,
+      }, { headers: { "cache-control": "no-store" } });
+    }
+
+    const reservation = await reserveAIReview(env, user);
+    if (!reservation) {
+      return Response.json({
+        output: lab.mockOutput + "\n\n" + controlledEvaluation(true, "The deterministic rubric passed. Your three AI coaching reviews for today have been used; they reset at 00:00 UTC."),
+        mode: "controlled-local",
+        passed,
+        tests,
+        reviewsRemaining: 0,
+      }, { headers: { "cache-control": "no-store" } });
+    }
+
+    try {
+      const modelResponse = await env.AI.run(MODEL_ID, {
           messages: [
             {
               role: "system",
@@ -92,21 +166,33 @@ async function handleGenAILab(request: Request, env: Env) {
           ],
           max_tokens: 220,
           temperature: 0.2,
-        });
-        const output = typeof modelResponse === "string" ? modelResponse : modelResponse.response;
-        if (output) {
-          return Response.json({ output: "Hosted model evaluation\n\n" + output, mode: "hosted-model", passed, tests }, { headers: { "cache-control": "no-store" } });
-        }
-      } catch {
-        // Local previews and unbound deployments use the deterministic evaluator below.
+      });
+      const output = typeof modelResponse === "string" ? modelResponse : modelResponse.response;
+      if (output) {
+        const reviewsRemaining = Math.max(0, AI_REVIEW_DAILY_LIMIT - reservation.count);
+        return Response.json({
+          output: "Hosted model evaluation\n\n" + output + `\n\nAI coaching reviews remaining today: ${reviewsRemaining}/${AI_REVIEW_DAILY_LIMIT}`,
+          mode: "hosted-model",
+          passed,
+          tests,
+          reviewsRemaining,
+        }, { headers: { "cache-control": "no-store" } });
       }
+      throw new Error("Hosted model returned no feedback.");
+    } catch (error) {
+      await releaseAIReview(env, user.userId, reservation.usageDate);
+      console.error(JSON.stringify({
+        event: "genai_model_evaluation_failed",
+        error: error instanceof Error ? error.name : "UnknownError",
+      }));
     }
 
     return Response.json({
-      output: lab.mockOutput + "\n\nControlled evaluator\nResult: PASS\nEvidence: Required workflow tools and report output are present.\nOne improvement: Explain why the chosen workflow satisfies the lab criteria.",
+      output: lab.mockOutput + "\n\n" + controlledEvaluation(true, "The deterministic rubric passed. Hosted coaching was unavailable, so this attempt did not use a daily review."),
       mode: "controlled-local",
       passed,
       tests,
+      reviewsRemaining: Math.max(0, AI_REVIEW_DAILY_LIMIT - reservation.count + 1),
     }, { headers: { "cache-control": "no-store" } });
   } catch {
     return Response.json({ error: "Invalid lab request." }, { status: 400 });

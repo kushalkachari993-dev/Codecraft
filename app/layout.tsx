@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import CodeCraftClerkProvider from "./clerk-provider";
+import { getClerkPublishableKey, type ClerkRuntimeEnvironment } from "./clerk-config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -51,12 +52,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const runtimeEnvironment = typeof process === "undefined" ? undefined : process.env as ClerkRuntimeEnvironment;
+  const publishableKey = getClerkPublishableKey(runtimeEnvironment);
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <CodeCraftClerkProvider>{children}</CodeCraftClerkProvider>
+        <CodeCraftClerkProvider publishableKey={publishableKey}>{children}</CodeCraftClerkProvider>
       </body>
     </html>
   );

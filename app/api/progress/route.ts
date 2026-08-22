@@ -1,4 +1,6 @@
+import { env } from "cloudflare:workers";
 import { getClerkUser } from "../../clerk-auth";
+import type { ClerkRuntimeEnvironment } from "../../clerk-config";
 import { normalizeProgress } from "../../progress";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +17,7 @@ async function upsertLearner(user: NonNullable<Awaited<ReturnType<typeof getCler
 }
 
 export async function GET(request: Request) {
-  const user = await getClerkUser(request);
+  const user = await getClerkUser(request, env as unknown as ClerkRuntimeEnvironment);
   if (!user) {
     return Response.json({ user: null, progress: null, storage: "local" }, { headers: { "cache-control": "no-store" } });
   }
@@ -39,7 +41,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const user = await getClerkUser(request);
+  const user = await getClerkUser(request, env as unknown as ClerkRuntimeEnvironment);
   if (!user) return Response.json({ error: "Sign in to sync progress." }, { status: 401 });
 
   const contentLength = Number(request.headers.get("content-length") ?? "0");

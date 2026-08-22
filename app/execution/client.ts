@@ -164,7 +164,10 @@ async function runGenAILab(request: ExecutionRequest, signal?: AbortSignal): Pro
   try {
     const response = await fetch("/api/genai-lab", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(request.authToken ? { authorization: `Bearer ${request.authToken}` } : {}),
+      },
       body: JSON.stringify({ code: request.code, topic: request.topic, required: request.required ?? false }),
       signal: controller.signal,
     });

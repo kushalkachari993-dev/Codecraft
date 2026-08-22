@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
+async function render(pathname = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", {
+    new Request(`http://localhost${pathname}`, {
       headers: { accept: "text/html" },
     }),
     {
@@ -67,10 +67,20 @@ test("runs controlled GenAI lab evaluation without exposing a model credential",
   assert.equal(payload.tests.length, 4);
   assert.deepEqual(payload.tests.map((item) => item.name), ["Grounding", "Tool usage", "Safety", "Output quality"]);
   assert.match(payload.output, /Result: PASS/);
+  assert.match(payload.output, /Sign in to request one of three daily AI coaching reviews/);
+});
+
+test("renders the privacy notice", async () => {
+  const response = await render("/privacy");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /What CodeCraft stores/);
+  assert.match(html, /Code execution and GenAI labs/);
+  assert.match(html, /Open account deletion controls/);
 });
 
 test("keeps the finished product free of starter-preview code", async () => {
-  const [page, layout, packageJson, pythonCurriculum, genaiCurriculum, sqlCurriculum, challenges, executionClient, pythonRunner, sqlRunner, worker, progressSource, progressRoute, submissionsRoute, schema, clerkAuth, clerkProvider] = await Promise.all([
+  const [page, layout, packageJson, pythonCurriculum, genaiCurriculum, sqlCurriculum, challenges, executionClient, pythonRunner, sqlRunner, worker, progressSource, progressRoute, submissionsRoute, schema, clerkAuth, clerkProvider, accountRoute, healthRoute, privacyPage, deleteAccountPage, migration] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -88,6 +98,11 @@ test("keeps the finished product free of starter-preview code", async () => {
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/clerk-auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/clerk-provider.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/account/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/health/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/privacy/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/account/delete/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0001_warm_edwin_jarvis.sql", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /const TRACKS: Track\[\]/);
@@ -174,6 +189,8 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(page, /openUserProfile/);
   assert.match(page, /clerkProfile\.update/);
   assert.match(page, /Saved submissions/);
+  assert.match(page, /Delete account/);
+  assert.match(page, /3 signed-in AI coaching reviews daily/);
   assert.match(page, /Badges by track/);
   assert.match(page, /LIVE REALM MAP/);
   assert.match(page, /WORLD BOSS/);
@@ -192,6 +209,18 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(submissionsRoute, /LIMIT 20/);
   assert.match(schema, /progressSnapshots/);
   assert.match(schema, /codeSubmissions/);
+  assert.match(schema, /aiReviewUsage/);
+  assert.match(worker, /AI_REVIEW_DAILY_LIMIT = 3/);
+  assert.match(worker, /INSERT INTO ai_review_usage/);
+  assert.match(worker, /llama-3\.1-8b-instruct-fp8-fast/);
+  assert.match(worker, /getClerkUser\(request, env\)/);
+  assert.match(executionClient, /request\.authToken/);
+  assert.match(accountRoute, /DELETE FROM ai_review_usage/);
+  assert.match(accountRoute, /clerk\.users\.deleteUser/);
+  assert.match(healthRoute, /status === "healthy" \? 200 : 503/);
+  assert.match(privacyPage, /What CodeCraft stores/);
+  assert.match(deleteAccountPage, /Permanently delete account/);
+  assert.match(migration, /CREATE TABLE `ai_review_usage`/);
   assert.match(page, /CONTROLLED AI RUNTIME/);
   assert.match(page, /NO PERSONAL API KEY · NO CREDITS/);
   assert.match(page, /executeLab/);

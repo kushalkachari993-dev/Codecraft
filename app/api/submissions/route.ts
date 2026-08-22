@@ -1,4 +1,6 @@
+import { env } from "cloudflare:workers";
 import { getClerkUser } from "../../clerk-auth";
+import type { ClerkRuntimeEnvironment } from "../../clerk-config";
 
 export const dynamic = "force-dynamic";
 
@@ -6,7 +8,7 @@ const TRACKS = new Set(["python", "sql", "genai"]);
 const PACES = new Set(["beginner", "intermediate", "expert"]);
 
 export async function POST(request: Request) {
-  const user = await getClerkUser(request);
+  const user = await getClerkUser(request, env as unknown as ClerkRuntimeEnvironment);
   if (!user) return Response.json({ saved: false, storage: "local" }, { status: 401 });
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (contentLength > 40_000) return Response.json({ error: "Submission is too large." }, { status: 413 });
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const user = await getClerkUser(request);
+  const user = await getClerkUser(request, env as unknown as ClerkRuntimeEnvironment);
   if (!user) return Response.json({ submissions: [] }, { status: 401 });
   const url = new URL(request.url);
   const track = url.searchParams.get("track");

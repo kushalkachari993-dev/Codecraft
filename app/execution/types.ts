@@ -4,6 +4,7 @@ export type ExecutionRequest = {
   track: ExecutionTrack;
   code: string;
   topic: string;
+  authToken?: string;
   required?: boolean;
   challenge?: ChallengeRuntimeSpec;
 };
