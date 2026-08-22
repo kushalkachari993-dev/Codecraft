@@ -18,9 +18,15 @@ const runtimePools: Record<RuntimeWorkerTrack, RuntimePool> = {
 function createRuntimeWorker(track: RuntimeWorkerTrack) {
   // Keep Python on a stable same-origin URL while using the module-worker form
   // required by the hosted browser environment (and by its dynamic import).
-  return track === "python"
-    ? new Worker("/python-runner.js", { name: "codecraft-python-runtime", type: "module" })
-    : new Worker(new URL("./sql-runner.worker.ts", import.meta.url), { type: "module" });
+  if (track === "python") {
+    return new Worker("/python-runner.js", { name: "codecraft-python-runtime", type: "module" });
+  }
+
+  const bundledSqlWorkerUrl = new URL("./sql-runner.worker.ts", import.meta.url);
+  const sqlWorkerUrl = bundledSqlWorkerUrl.protocol === "file:"
+    ? bundledSqlWorkerUrl.pathname
+    : bundledSqlWorkerUrl.href;
+  return new Worker(sqlWorkerUrl, { name: "codecraft-sql-runtime", type: "module" });
 }
 
 function getRuntimeWorker(track: RuntimeWorkerTrack) {
