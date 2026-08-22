@@ -7,6 +7,7 @@ import { GENAI_PACES, buildGenAILab, validateGenAILab, type GenAIPaceId, type Ge
 import { SQL_PACES, type SQLPaceId, type SQLTopic } from "./sql-curriculum";
 import { executeLab, prepareLabRuntime } from "./execution/client";
 import { buildPythonChallenge, buildSQLChallenge } from "./challenges";
+import { getLessonEnrichment } from "./authored-lessons";
 import type { ExecutionResult, RuntimeProgress, RuntimeWorkerTrack } from "./execution/types";
 import { DEFAULT_PROGRESS, mergeProgress, normalizeProgress, type AvatarId, type PlayerProgress } from "./progress";
 
@@ -332,7 +333,17 @@ function buildSQLTheory(topic: SQLTopic): TheoryContent {
   };
 }
 
-function buildQuiz(quest: Quest): QuizQuestion[] {
+function rotateQuizOptions(question: QuizQuestion, offset: number): QuizQuestion {
+  const shift = offset % question.options.length;
+  return {
+    ...question,
+    options: [...question.options.slice(shift), ...question.options.slice(0, shift)],
+    answer: (question.answer - shift + question.options.length) % question.options.length,
+  };
+}
+
+function buildQuiz(quest: Quest, authored: QuizQuestion[] | null = null): QuizQuestion[] {
+  if (authored) return authored;
   const firstCodeLine = quest.starterCode.split("\n").find((line) => line.trim() && !line.trim().startsWith("#")) ?? quest.starterCode;
   return [
     {
@@ -353,7 +364,7 @@ function buildQuiz(quest: Quest): QuizQuestion[] {
       answer: 0,
       explanation: `The section objective is: ${quest.objective}.`,
     },
-  ];
+  ].map((question, index) => rotateQuizOptions(question, quest.id + index));
 }
 
 function loadProgress(): PlayerProgress {
@@ -452,7 +463,8 @@ export default function Home() {
     : activeTrack.id === "genai"
       ? buildGenAITheory(activeGenAIPace.topics[activeQuest.id - 1])
       : buildSQLTheory(activeSQLPace.topics[activeQuest.id - 1]);
-  const activeQuiz = buildQuiz(activeQuest);
+  const activeLessonEnrichment = getLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title);
+  const activeQuiz = buildQuiz(activeQuest, activeLessonEnrichment?.quiz ?? null);
   const completedCount = trackCompleted.length;
   const progressPercent = Math.round((completedCount / activeQuests.length) * 100);
   const level = Math.max(1, Math.floor((progress.xp - 120) / 100) + 1);
@@ -1465,6 +1477,10 @@ export default function Home() {
                 <div className="theory-foundation">
                   <span>CORE EXPLANATION</span>
                   <p>{activeTheory.deeper}</p>
+                {activeLessonEnrichment && <div className="theory-foundation lesson-impact">
+                  <span>WHY THIS MATTERS</span>
+                  <p>{activeLessonEnrichment.whyItMatters}</p>
+                </div>}
                 </div>
                 <div className="theory-heading"><span>KNOWLEDGE BLOCKS</span><h2>Build the concept piece by piece</h2></div>
                 <div className="theory-grid rich">
@@ -1490,9 +1506,11 @@ export default function Home() {
                 <p className="learning-lead">Here is a complete, read-only example. Follow the idea line by line, then take the knowledge checkpoint.</p>
                 <div className="example-code"><div><span>EXAMPLE.{activeTrack.id === "sql" ? "SQL" : "PY"}</span><small>READ ONLY</small></div><pre>{activeQuest.starterCode}</pre></div>
                 <div className="walkthrough-list">
-                  <article><b>1</b><p><strong>Set up the instruction</strong>The first meaningful line introduces the data, command, or query the program needs.</p></article>
-                  <article><b>2</b><p><strong>Apply the concept</strong>The program uses {activeQuest.concept.toLowerCase()} to perform the section&apos;s main job.</p></article>
-                  <article><b>3</b><p><strong>Check the result</strong>A correct run should: {activeQuest.objective.toLowerCase()}.</p></article>
+                  {(activeLessonEnrichment?.walkthrough ?? [
+                    { title: "Set up the instruction", body: "The first meaningful line introduces the data, command, or query the program needs." },
+                    { title: "Apply the concept", body: `The program uses ${activeQuest.concept.toLowerCase()} to perform the section's main job.` },
+                    { title: "Check the result", body: `A correct run should: ${activeQuest.objective.toLowerCase()}.` },
+                  ]).map((step, index) => <article key={step.title}><b>{index + 1}</b><p><strong>{step.title}</strong>{step.body}</p></article>)}
                 </div>
                 <div className="curriculum-actions"><button onClick={() => setLessonStage("theory")}>← Review theory</button><button className="curriculum-next" onClick={() => { setQuizAnswers({}); setQuizResult("idle"); setLessonStage("quiz"); }}>Take the checkpoint →</button></div>
               </div>
@@ -1505,7 +1523,7 @@ export default function Home() {
                 {activeQuiz.map((question, questionIndex) => (
                   <fieldset key={question.question}><legend><span>{questionIndex + 1}</span>{question.question}</legend>
                     {question.options.map((option, optionIndex) => <label className={quizAnswers[questionIndex] === optionIndex ? "selected" : ""} key={option}><input type="radio" name={`question-${questionIndex}`} checked={quizAnswers[questionIndex] === optionIndex} onChange={() => { setQuizAnswers((current) => ({ ...current, [questionIndex]: optionIndex })); setQuizResult("idle"); }} /><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></label>)}
-                    {quizResult !== "idle" && quizAnswers[questionIndex] !== undefined && <p className={quizAnswers[questionIndex] === question.answer ? "correct" : "incorrect"}>{quizAnswers[questionIndex] === question.answer ? "✓ Correct" : `✕ ${question.explanation}`}</p>}
+                    {quizResult !== "idle" && quizAnswers[questionIndex] !== undefined && <p className={quizAnswers[questionIndex] === question.answer ? "correct" : "incorrect"}>{quizAnswers[questionIndex] === question.answer ? `✓ Correct — ${question.explanation}` : `✕ ${question.explanation}`}</p>}
                   </fieldset>
                 ))}
               </div>

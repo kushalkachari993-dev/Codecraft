@@ -53,6 +53,113 @@ const PYTHON_CONSTRUCTS: Array<{ pattern: RegExp; source: string; label: string;
   { pattern: /cache|queue|cloud|observability|architecture|distributed|package design|specialization/i, source: "\\{[^}]*:", label: "Returns a structured system plan", hint: "Return a dictionary describing the components and one important tradeoff." },
 ];
 
+function buildAuthoredPythonChallenge(topic: PythonTopic): TopicChallenge | null {
+  if (topic.title === "Environment") return {
+    title: "Interpreter diagnostic mission",
+    instructions: "Build environment_report() using Python's sys and platform modules. Return the implementation name, a two-number version tuple, and the platform name so another developer can reproduce the runtime.",
+    starterCode: "import platform\nimport sys\n\ndef environment_report():\n    # TODO: inspect this interpreter instead of hard-coding values.\n    return {\n        \"implementation\": None,\n        \"version\": None,\n        \"platform\": None,\n    }\n\nprint(environment_report())\n",
+    visibleExamples: [
+      { label: "REQUIRED SHAPE", input: "environment_report()", output: "{'implementation': <name>, 'version': (<major>, <minor>), 'platform': <name>}" },
+      { label: "RUNTIME RULE", input: "The active browser interpreter", output: "Values are inspected at runtime, never hard-coded" },
+    ],
+    runtime: {
+      minimumCodeLength: 100,
+      requiredPatterns: [
+        { pattern: "(^|\\n)\\s*import\\s+sys", flags: "im", name: "Uses sys", hint: "Import sys and read sys.version_info." },
+        { pattern: "(^|\\n)\\s*import\\s+platform", flags: "im", name: "Uses platform", hint: "Import platform and call platform.python_implementation() and platform.system()." },
+      ],
+      pythonTests: [
+        { name: "Diagnostic function exists", code: "assert callable(globals().get('environment_report'))", hint: "Keep environment_report() exactly as named." },
+        { name: "Reports the active interpreter", code: "report = environment_report(); assert report['implementation'] == platform.python_implementation() and report['version'] == (sys.version_info.major, sys.version_info.minor)", hint: "Read values from platform and sys rather than typing fixed values." },
+        { name: "Reports the active platform", code: "report = environment_report(); assert report['platform'] == platform.system() and all(report.values())", hint: "Use platform.system() and return all three required fields." },
+      ],
+    },
+  };
+
+  if (topic.title === "Variables") return {
+    title: "Energy state mission",
+    instructions: "Complete update_energy(start, collected, spent). Use descriptive variables to add collected cells, subtract spent cells, and return the remaining energy without hard-coded answers.",
+    starterCode: "def update_energy(start, collected, spent):\n    # TODO: calculate the state in two readable steps.\n    energy_after_collection = None\n    remaining_energy = None\n    return remaining_energy\n\nprint(update_energy(10, 5, 3))\n",
+    visibleExamples: [
+      { label: "VISIBLE EXAMPLE", input: "update_energy(10, 5, 3)", output: "12" },
+      { label: "EDGE CASE", input: "update_energy(4, 0, 4)", output: "0" },
+    ],
+    runtime: {
+      minimumCodeLength: 80,
+      requiredPatterns: [{ pattern: "\\b(energy_after_collection|remaining_energy)\\s*=", flags: "im", name: "Uses descriptive state names", hint: "Calculate with energy_after_collection and remaining_energy." }],
+      pythonTests: [
+        { name: "Update function exists", code: "assert callable(globals().get('update_energy'))", hint: "Keep update_energy(start, collected, spent)." },
+        { name: "Calculates the visible state", code: "assert update_energy(10, 5, 3) == 12", hint: "Add collected first, then subtract spent." },
+        { name: "Handles zero remaining", code: "assert update_energy(4, 0, 4) == 0", hint: "Return the calculation rather than a truthiness shortcut." },
+        { name: "Uses every input", code: "assert update_energy(20, 2, 7) == 15 and update_energy(1, 9, 0) == 10", hint: "Derive the result from all three parameters." },
+      ],
+    },
+  };
+
+  if (topic.title === "Data types") return {
+    title: "Telemetry normalization mission",
+    instructions: "Complete normalize_relay(raw). Convert id to int, power to float, and the case-insensitive text 'true' to a real bool. Return a new dictionary with exactly id, power, and online.",
+    starterCode: "def normalize_relay(raw):\n    # External data arrives as strings. Convert it once at the boundary.\n    return {\n        \"id\": None,\n        \"power\": None,\n        \"online\": None,\n    }\n\nsample = {\"id\": \"7\", \"power\": \"82.5\", \"online\": \"TRUE\"}\nprint(normalize_relay(sample))\n",
+    visibleExamples: [
+      { label: "VISIBLE EXAMPLE", input: "{'id': '7', 'power': '82.5', 'online': 'TRUE'}", output: "{'id': 7, 'power': 82.5, 'online': True}" },
+      { label: "SECOND CASE", input: "{'id': '3', 'power': '0', 'online': 'false'}", output: "{'id': 3, 'power': 0.0, 'online': False}" },
+    ],
+    runtime: {
+      minimumCodeLength: 90,
+      requiredPatterns: [{ pattern: "\\b(int|float)\\s*\\(", flags: "im", name: "Converts boundary values", hint: "Use int() and float() for their corresponding fields." }],
+      pythonTests: [
+        { name: "Normalizer exists", code: "assert callable(globals().get('normalize_relay'))", hint: "Keep normalize_relay(raw)." },
+        { name: "Converts every visible field", code: "assert normalize_relay({'id': '7', 'power': '82.5', 'online': 'TRUE'}) == {'id': 7, 'power': 82.5, 'online': True}", hint: "Convert the two numeric strings and compare normalized online text with 'true'." },
+        { name: "Handles a false value", code: "assert normalize_relay({'id': '3', 'power': '0', 'online': 'false'}) == {'id': 3, 'power': 0.0, 'online': False}", hint: "Do not use bool(raw['online']); any non-empty string would become True." },
+        { name: "Returns real Python types", code: "r = normalize_relay({'id': '9', 'power': '71.25', 'online': 'true'}); assert type(r['id']) is int and type(r['power']) is float and type(r['online']) is bool", hint: "Return int, float, and bool values—not strings that look like them." },
+      ],
+    },
+  };
+
+  if (topic.title === "Operators") return {
+    title: "Relay readiness mission",
+    instructions: "Complete is_relay_ready(power, online, sector). A relay is ready only when it is online, power is at least 70, and sector is either north or east. Return a boolean.",
+    starterCode: "def is_relay_ready(power, online, sector):\n    allowed_sectors = {\"north\", \"east\"}\n    # TODO: combine all three rules in one clear boolean expression.\n    return None\n\nprint(is_relay_ready(82, True, \"north\"))\n",
+    visibleExamples: [
+      { label: "VISIBLE EXAMPLE", input: "is_relay_ready(82, True, 'north')", output: "True" },
+      { label: "BOUNDARY", input: "is_relay_ready(70, True, 'east')", output: "True" },
+    ],
+    runtime: {
+      minimumCodeLength: 70,
+      requiredPatterns: [{ pattern: "\\band\\b.*\\bin\\b", flags: "ims", name: "Combines comparison and membership", hint: "Use and to require every rule, and in to check allowed_sectors." }],
+      pythonTests: [
+        { name: "Readiness function exists", code: "assert callable(globals().get('is_relay_ready'))", hint: "Keep is_relay_ready(power, online, sector)." },
+        { name: "Accepts a ready relay", code: "assert is_relay_ready(82, True, 'north') is True and is_relay_ready(70, True, 'east') is True", hint: "The threshold includes exactly 70 and both allowed sectors." },
+        { name: "Rejects every failed rule", code: "assert is_relay_ready(69, True, 'north') is False and is_relay_ready(99, False, 'north') is False and is_relay_ready(99, True, 'south') is False", hint: "All three requirements must be true, so combine them with and." },
+      ],
+    },
+  };
+
+  if (topic.title === "Strings") return {
+    title: "Callsign formatter mission",
+    instructions: "Complete format_callsign(name, sector). Remove outer whitespace, title-case the explorer name, uppercase the sector, and join them with a hyphen using an f-string.",
+    starterCode: "def format_callsign(name, sector):\n    clean_name = None\n    clean_sector = None\n    # TODO: return NAME-SECTOR in the requested casing.\n    return None\n\nprint(format_callsign(\"  nova ray  \", \" north \"))\n",
+    visibleExamples: [
+      { label: "VISIBLE EXAMPLE", input: "format_callsign('  nova ray  ', ' north ')", output: "Nova Ray-NORTH" },
+      { label: "SECOND CASE", input: "format_callsign('mira', 'east')", output: "Mira-EAST" },
+    ],
+    runtime: {
+      minimumCodeLength: 75,
+      requiredPatterns: [
+        { pattern: "\\.(strip|title|upper)\\s*\\(", flags: "im", name: "Normalizes text", hint: "Use strip(), title(), and upper() on the appropriate values." },
+        { pattern: "f['\"]", flags: "im", name: "Formats with an f-string", hint: "Return the two cleaned values with an f-string." },
+      ],
+      pythonTests: [
+        { name: "Formatter exists", code: "assert callable(globals().get('format_callsign'))", hint: "Keep format_callsign(name, sector)." },
+        { name: "Cleans the visible case", code: "assert format_callsign('  nova ray  ', ' north ') == 'Nova Ray-NORTH'", hint: "Strip both inputs, title-case the name, uppercase the sector, and add one hyphen." },
+        { name: "Uses both inputs", code: "assert format_callsign('mira', 'east') == 'Mira-EAST' and format_callsign('  kiro', 'south  ') == 'Kiro-SOUTH'", hint: "Do not hard-code the visible example." },
+      ],
+    },
+  };
+
+  return null;
+}
+
 export function buildPythonChallenge(topic: PythonTopic, options: ChallengeOptions = {}): TopicChallenge {
   if (options.required) {
     const worldName = options.worldName ?? "CodeCraft world";
@@ -88,6 +195,8 @@ export function buildPythonChallenge(topic: PythonTopic, options: ChallengeOptio
       },
     };
   }
+  const authoredChallenge = buildAuthoredPythonChallenge(topic);
+  if (authoredChallenge) return authoredChallenge;
   const construct = PYTHON_CONSTRUCTS.find((item) => item.pattern.test(topic.title)) ?? {
     source: "\\bdef\\s+solve_relay\\s*\\(",
     label: "Defines solve_relay",
@@ -212,7 +321,41 @@ export function buildSQLChallenge(topic: SQLTopic, options: ChallengeOptions = {
   let starterCode = "-- " + topic.title + " challenge\n-- Use relays, sectors, readings, alerts, users, orders, relay_events, or challenge_notes.\n-- TODO: write your solution here.\n";
   let instructions = topic.learningGoal + " Finish with a SELECT so the result can be graded.";
 
-  if (topic.title === "SELECT") {
+  if (topic.title === "Database basics") {
+    instructions = "Inspect the supplied database catalog. Return the public relations readings, relays, and sectors under a result column named relation, ordered alphabetically.";
+    starterCode = "-- Inspect the schema instead of guessing which relations exist.\nSELECT /* table name */ AS relation\nFROM information_schema.tables\nWHERE table_schema = 'public'\n  AND table_name IN (/* three core relations */)\nORDER BY relation;\n";
+    commonRuntime.sqlTests = [
+      { name: "Catalog result is named", kind: "result-columns", columns: ["relation"], hint: "Select table_name AS relation." },
+      { name: "Finds the three core relations", kind: "result-value", column: "relation", expected: ["readings", "relays", "sectors"], hint: "Filter the public catalog to readings, relays, and sectors." },
+      { name: "Returns exactly the requested catalog slice", kind: "result-max-rows", minRows: 3, maxRows: 3, hint: "Return only the three named public relations." },
+    ];
+  } else if (topic.title === "Tables/rows/columns") {
+    instructions = "Create relay_checks so every row has a bigint check_id primary key, a relay_id referencing relays, and a non-null text note. Finish by selecting its column metadata.";
+    starterCode = "CREATE TABLE relay_checks (\n  check_id bigint /* identity rule */,\n  relay_id bigint /* relationship */,\n  note text /* required value */\n);\n\nSELECT column_name, data_type, is_nullable\nFROM information_schema.columns\nWHERE table_name = 'relay_checks'\nORDER BY ordinal_position;\n";
+    commonRuntime.sqlTests = [
+      { name: "Focused table exists", kind: "database-value", query: "SELECT count(*)::int AS count FROM information_schema.tables WHERE table_name = 'relay_checks'", column: "count", expected: 1, hint: "Create relay_checks with the exact requested name." },
+      { name: "Rows have a primary identity", kind: "database-value", query: "SELECT count(*)::int AS count FROM information_schema.table_constraints WHERE table_name = 'relay_checks' AND constraint_type = 'PRIMARY KEY'", column: "count", expected: 1, hint: "Declare check_id as the primary key." },
+      { name: "Relationship is enforced", kind: "database-value", query: "SELECT count(*)::int AS count FROM information_schema.table_constraints WHERE table_name = 'relay_checks' AND constraint_type = 'FOREIGN KEY'", column: "count", expected: 1, hint: "Make relay_id reference relays(relay_id)." },
+      { name: "Metadata is inspectable", kind: "result-min-rows", minRows: 3, hint: "Finish with the supplied information_schema query." },
+    ];
+  } else if (topic.title === "Data types") {
+    instructions = "Create telemetry_samples with a bigint primary key, numeric(6,2) voltage, timestamptz captured_at, and boolean valid. Insert the supplied sample, then return it.";
+    starterCode = "CREATE TABLE telemetry_samples (\n  sample_id /* type and key */,\n  voltage /* exact numeric type */,\n  captured_at /* timezone-aware timestamp */,\n  valid /* true/false type */\n);\n\nINSERT INTO telemetry_samples VALUES (1, 48.25, '2026-08-23T10:00:00Z', true);\nSELECT sample_id, voltage, captured_at, valid FROM telemetry_samples;\n";
+    commonRuntime.sqlTests = [
+      { name: "Voltage preserves exact precision", kind: "database-value", query: "SELECT data_type FROM information_schema.columns WHERE table_name = 'telemetry_samples' AND column_name = 'voltage'", column: "data_type", expected: "numeric", hint: "Declare voltage as numeric(6,2)." },
+      { name: "Timestamp preserves timezone meaning", kind: "database-value", query: "SELECT data_type FROM information_schema.columns WHERE table_name = 'telemetry_samples' AND column_name = 'captured_at'", column: "data_type", expected: "timestamp with time zone", hint: "Use timestamptz for captured_at." },
+      { name: "Validity is a boolean", kind: "database-value", query: "SELECT data_type FROM information_schema.columns WHERE table_name = 'telemetry_samples' AND column_name = 'valid'", column: "data_type", expected: "boolean", hint: "Declare valid as boolean, not text." },
+      { name: "Typed sample is returned", kind: "result-value", column: "sample_id", expected: 1, hint: "Insert and return the supplied sample row." },
+    ];
+  } else if (topic.title === "CRUD") {
+    instructions = "Practice the full CRUD cycle: insert Nova Relay at sector 2 with power 71, update its power to 80, delete challenge note 1, and finish by selecting Nova Relay.";
+    starterCode = "-- CREATE\nINSERT INTO relays (sector_id, name, online, power, efficiency)\nVALUES (2, 'Nova Relay', true, 71, .90);\n\n-- UPDATE the same relay\nUPDATE relays SET power = /* new value */ WHERE name = 'Nova Relay';\n\n-- DELETE only the requested practice note\nDELETE FROM challenge_notes WHERE /* precise identity */;\n\n-- READ the final relay state\nSELECT name, online, power FROM relays WHERE name = 'Nova Relay';\n";
+    commonRuntime.sqlTests = [
+      { name: "Nova Relay was created and updated", kind: "database-value", query: "SELECT count(*)::int AS count FROM relays WHERE name = 'Nova Relay' AND online AND power = 80", column: "count", expected: 1, hint: "Insert Nova Relay, then update that row to power 80." },
+      { name: "Delete targeted one practice row", kind: "database-value", query: "SELECT count(*)::int AS count FROM challenge_notes WHERE note_id = 1", column: "count", expected: 0, hint: "Delete challenge_notes row 1 with a precise WHERE predicate." },
+      { name: "Final state is visible", kind: "result-value", column: "name", expected: "Nova Relay", hint: "Finish with the supplied SELECT for Nova Relay." },
+    ];
+  } else if (topic.title === "SELECT") {
     starterCode = "-- Return relay_id and name for every relay.\nSELECT /* columns */\nFROM relays;\n";
     commonRuntime.sqlTests = [
       { name: "Correct result columns", kind: "result-columns", columns: ["relay_id", "name"], hint: "Select relay_id and name explicitly." },
@@ -239,13 +382,6 @@ export function buildSQLChallenge(topic: SQLTopic, options: ChallengeOptions = {
     commonRuntime.sqlTests = [
       { name: "Joined result columns", kind: "result-columns", columns: ["name", "sector_name"], hint: "Select r.name and alias s.name as sector_name." },
       { name: "Every relay joined", kind: "result-min-rows", minRows: 4, hint: "Join sectors on the sector_id key." },
-    ];
-  } else if (topic.title === "CRUD") {
-    instructions = "Insert a new online relay named Nova Relay with sector_id 2, power 71, and efficiency .90. Finish by selecting that row.";
-    starterCode = "-- Create one relay, then prove it exists.\nINSERT INTO relays (sector_id, name, online, power, efficiency)\nVALUES (/* values */);\n\nSELECT name, online, power FROM relays WHERE name = 'Nova Relay';\n";
-    commonRuntime.sqlTests = [
-      { name: "Nova Relay persisted", kind: "database-value", query: "SELECT count(*)::int AS count FROM relays WHERE name = 'Nova Relay' AND online AND power = 71", column: "count", expected: 1, hint: "Insert Nova Relay with the exact requested values." },
-      { name: "Inserted row is visible", kind: "result-value", column: "name", expected: "Nova Relay", hint: "Finish by selecting the inserted row." },
     ];
   } else if (/Tables\/rows\/columns|Data types|Primary keys|Foreign keys|Constraints|Relationships|Basic schema design|Normalization|Schema design|Dimensional modeling|Database architecture/i.test(topic.title)) {
     instructions = "Create a lab_nodes table with node_id as its primary key, a non-null name, and a positive power constraint. Finish by selecting its columns.";

@@ -53,7 +53,7 @@ test("runs controlled GenAI lab evaluation without exposing a model credential",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         topic: "AI/ML basics",
-        code: "input_data = load_prompt_case('prompt_cases.json')\nresult = run_mock_model(input_data)\nreport = compare_behavior(result)\nprint(report)",
+        code: "input_data = load_routing_case('routing_cases.json')\nresult = run_rule_baseline(input_data)\nreport = compare_model_candidate(result)\nprint(report)",
       }),
     }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },

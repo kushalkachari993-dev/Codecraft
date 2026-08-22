@@ -133,8 +133,63 @@ const DEFAULT_GENAI_LAB: GenAILabFamily = {
   mission: "Build and verify a small controlled AI workflow for this topic.",
 };
 
+const AUTHORED_BEGINNER_LABS: Record<string, GenAILabFamily> = {
+  "AI/ML basics": {
+    labType: "guided code",
+    fileName: "baseline_comparison.py",
+    dataFiles: ["routing_cases.json", "candidate_predictions.json"],
+    tools: ["Routing case loader", "Rule baseline", "Candidate comparator"],
+    requiredCalls: ["load_routing_case", "run_rule_baseline", "compare_model_candidate"],
+    successCriteria: ["Establish a deterministic baseline", "Compare the model candidate on the same cases", "Explain whether learned complexity adds measurable value"],
+    mockOutput: "Cases evaluated: 12\nRule baseline accuracy: 83%\nModel candidate accuracy: 92%\nAdded-value check: PASS",
+    mission: "Compare a learned routing candidate with a deterministic rule baseline before recommending AI.",
+  },
+  "Neural network basics": {
+    labType: "guided code",
+    fileName: "network_trace.py",
+    dataFiles: ["training_batch.json", "network_snapshot.json"],
+    tools: ["Training batch loader", "Forward-pass tracer", "Loss inspector"],
+    requiredCalls: ["load_training_batch", "run_forward_pass", "inspect_loss"],
+    successCriteria: ["Trace features through a forward pass", "Connect predictions to a target", "Interpret loss without claiming that inference trains the model"],
+    mockOutput: "Batch size: 8\nForward pass: complete\nLoss: 0.184\nTraining/inference distinction: PASS",
+    mission: "Trace one small neural-network batch from input through prediction and loss.",
+  },
+  "NLP basics": {
+    labType: "guided code",
+    fileName: "nlp_task_eval.py",
+    dataFiles: ["support_messages.json", "expected_labels.json"],
+    tools: ["Language case loader", "Task pipeline", "Task-output evaluator"],
+    requiredCalls: ["load_language_cases", "run_task_pipeline", "evaluate_task_output"],
+    successCriteria: ["Define a classification output contract", "Run representative and ambiguous language cases", "Evaluate task correctness instead of fluency alone"],
+    mockOutput: "Language cases: 16\nSchema validity: 100%\nMacro F1: 0.88\nAmbiguity review: PASS",
+    mission: "Evaluate a support-message classifier on ordinary, ambiguous, and domain-specific language.",
+  },
+  "Transformers": {
+    labType: "guided code",
+    fileName: "attention_trace.py",
+    dataFiles: ["token_sequence.json", "attention_mask.json"],
+    tools: ["Token sequence loader", "Attention tracer", "Context-state inspector"],
+    requiredCalls: ["load_token_sequence", "trace_attention", "inspect_context_states"],
+    successCriteria: ["Preserve token order information", "Apply the supplied attention mask", "Explain which tokens influence the inspected representation"],
+    mockOutput: "Tokens traced: 9\nMask violations: 0\nHighest contextual influence: relay\nAttention interpretation: PASS",
+    mission: "Trace how token order, masking, and attention contribute to one contextual representation.",
+  },
+  "LLM fundamentals": {
+    labType: "guided code",
+    fileName: "generation_comparison.py",
+    dataFiles: ["prompt_case.json", "generation_settings.json"],
+    tools: ["Prompt case loader", "Continuation generator", "Generation comparator"],
+    requiredCalls: ["load_prompt_case", "generate_continuations", "compare_generation_settings"],
+    successCriteria: ["Generate controlled token continuations", "Compare deterministic and sampled settings", "Identify unsupported claims rather than treating fluency as truth"],
+    mockOutput: "Continuations generated: 4\nDeterministic agreement: 100%\nSampled variation detected: yes\nUnsupported-claim check: PASS",
+    mission: "Compare token continuations under two decoding settings and inspect their factual support.",
+  },
+};
+
 export function buildGenAILab(topic: GenAITopic, required = false, worldName = "GenAI world"): GenAILabSpec {
-  const family = GENAI_LAB_FAMILIES.find((item) => item.pattern.test(topic.title))?.spec ?? DEFAULT_GENAI_LAB;
+  const family = AUTHORED_BEGINNER_LABS[topic.title]
+    ?? GENAI_LAB_FAMILIES.find((item) => item.pattern.test(topic.title))?.spec
+    ?? DEFAULT_GENAI_LAB;
   const title = required ? worldName + " applied project" : topic.title + " practice lab";
   const brief = required
     ? "Stabilize this world by applying " + topic.title + " in a complete, controlled workflow. This project completes the world's applied checkpoint."
