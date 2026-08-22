@@ -241,8 +241,7 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(challenges, /database-value/);
   assert.match(challenges, /VISIBLE EXAMPLE/);
   assert.match(executionClient, /python-runner[.]js[\s\S]*type: "module"/);
-  assert.match(executionClient, /sql-runner\.worker\.ts/);
-  assert.match(executionClient, /bundledSqlWorkerUrl\.protocol === "file:"/);
+  assert.match(executionClient, /sql-runner\.worker\?worker&url/);
   assert.match(executionClient, /runtimePools/);
   assert.match(executionClient, /python-runner[.]js/);
   assert.match(executionClient, /prepareLabRuntime/);

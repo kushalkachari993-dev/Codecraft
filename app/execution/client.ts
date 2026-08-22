@@ -1,4 +1,5 @@
 import type { ExecutionRequest, ExecutionResult, RuntimeProgress, RuntimeWorkerTrack, WorkerExecutionRequest, WorkerExecutionResponse } from "./types";
+import sqlRunnerWorkerUrl from "./sql-runner.worker?worker&url";
 
 let requestId = 0;
 const COLD_START_TIMEOUT = { python: 90_000, sql: 90_000 } satisfies Record<RuntimeWorkerTrack, number>;
@@ -22,11 +23,7 @@ function createRuntimeWorker(track: RuntimeWorkerTrack) {
     return new Worker("/python-runner.js", { name: "codecraft-python-runtime", type: "module" });
   }
 
-  const bundledSqlWorkerUrl = new URL("./sql-runner.worker.ts", import.meta.url);
-  const sqlWorkerUrl = bundledSqlWorkerUrl.protocol === "file:"
-    ? bundledSqlWorkerUrl.pathname
-    : bundledSqlWorkerUrl.href;
-  return new Worker(sqlWorkerUrl, { name: "codecraft-sql-runtime", type: "module" });
+  return new Worker(sqlRunnerWorkerUrl, { name: "codecraft-sql-runtime", type: "module" });
 }
 
 function getRuntimeWorker(track: RuntimeWorkerTrack) {
