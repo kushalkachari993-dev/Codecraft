@@ -2,6 +2,7 @@ import type { PythonTopic } from "./python-curriculum";
 import type { SQLTopic } from "./sql-curriculum";
 import type { ChallengeRuntimeSpec } from "./execution/types";
 import { buildRoundTwoPythonChallenge, buildRoundTwoSQLChallenge } from "./round2-challenges";
+import { buildRoundThreePythonChallenge, buildRoundThreeSQLChallenge } from "./round3-challenges";
 
 export type TopicChallenge = {
   title: string;
@@ -164,6 +165,8 @@ function buildAuthoredPythonChallenge(topic: PythonTopic): TopicChallenge | null
 export function buildPythonChallenge(topic: PythonTopic, options: ChallengeOptions = {}): TopicChallenge {
   const roundTwoChallenge = buildRoundTwoPythonChallenge(topic, options);
   if (roundTwoChallenge) return roundTwoChallenge;
+  const roundThreeChallenge = buildRoundThreePythonChallenge(topic, options);
+  if (roundThreeChallenge) return roundThreeChallenge;
   if (options.required) {
     const worldName = options.worldName ?? "CodeCraft world";
     return {
@@ -273,6 +276,8 @@ export function buildSQLChallenge(topic: SQLTopic, options: ChallengeOptions = {
   const roundTwoChallenge = buildRoundTwoSQLChallenge(topic, options);
   if (roundTwoChallenge) return roundTwoChallenge;
   if (options.required) {
+  const roundThreeChallenge = buildRoundThreeSQLChallenge(topic, options);
+  if (roundThreeChallenge) return roundThreeChallenge;
     const worldName = options.worldName ?? "CodeCraft world";
     return {
       title: worldName + " SQL project",
