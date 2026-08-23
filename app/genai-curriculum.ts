@@ -1,3 +1,5 @@
+import { buildRoundTwoGenAILab } from "./round2-genai-labs";
+
 export type GenAIPaceId = "beginner" | "intermediate" | "expert";
 
 export type GenAITopic = {
@@ -187,6 +189,8 @@ const AUTHORED_BEGINNER_LABS: Record<string, GenAILabFamily> = {
 };
 
 export function buildGenAILab(topic: GenAITopic, required = false, worldName = "GenAI world"): GenAILabSpec {
+  const roundTwoLab = buildRoundTwoGenAILab(topic, required, worldName);
+  if (roundTwoLab) return roundTwoLab;
   const family = AUTHORED_BEGINNER_LABS[topic.title]
     ?? GENAI_LAB_FAMILIES.find((item) => item.pattern.test(topic.title))?.spec
     ?? DEFAULT_GENAI_LAB;

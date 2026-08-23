@@ -25,7 +25,7 @@ export type SourceRequirement = { pattern: string; flags?: string; name: string;
 export type PythonHiddenTest = { name: string; code: string; hint: string };
 export type SQLHiddenTest = {
   name: string;
-  kind: "result-columns" | "result-min-rows" | "result-max-rows" | "result-value" | "database-value";
+  kind: "result-columns" | "result-min-rows" | "result-max-rows" | "result-value" | "result-ordered-values" | "database-value";
   columns?: string[];
   minRows?: number;
   maxRows?: number;

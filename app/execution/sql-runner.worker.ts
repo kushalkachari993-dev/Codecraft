@@ -137,6 +137,11 @@ async function gradeSQL(database: PGlite, code: string, table: ResultTable | und
       const actual = Array.isArray(test.expected) ? values : values[0];
       passed = sameValue(actual, test.expected);
       detail = passed ? "Result value matches the mission." : "Received " + JSON.stringify(actual) + ".";
+    } else if (test.kind === "result-ordered-values") {
+      const actual = (table?.rows ?? []).map((row) => String(row[test.column ?? ""]));
+      const expected = Array.isArray(test.expected) ? test.expected.map(String) : [String(test.expected)];
+      passed = JSON.stringify(actual) === JSON.stringify(expected);
+      detail = passed ? "Result values are in the required order." : "Received order " + JSON.stringify(actual) + ".";
     } else if (test.kind === "database-value" && test.query) {
       const queryResult = await database.query(test.query) as { rows: Record<string, unknown>[] };
       const values = normalizeRows(queryResult.rows).map((row) => row[test.column ?? Object.keys(row)[0]]);

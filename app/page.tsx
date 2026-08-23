@@ -8,6 +8,7 @@ import { SQL_PACES, type SQLPaceId, type SQLTopic } from "./sql-curriculum";
 import { executeLab, prepareLabRuntime } from "./execution/client";
 import { buildPythonChallenge, buildSQLChallenge } from "./challenges";
 import { getLessonEnrichment } from "./authored-lessons";
+import { getRoundTwoLessonEnrichment } from "./authored-lessons-round2";
 import type { ExecutionResult, RuntimeProgress, RuntimeWorkerTrack } from "./execution/types";
 import { DEFAULT_PROGRESS, mergeProgress, normalizeProgress, type AvatarId, type PlayerProgress } from "./progress";
 
@@ -463,7 +464,8 @@ export default function Home() {
     : activeTrack.id === "genai"
       ? buildGenAITheory(activeGenAIPace.topics[activeQuest.id - 1])
       : buildSQLTheory(activeSQLPace.topics[activeQuest.id - 1]);
-  const activeLessonEnrichment = getLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title);
+  const activeLessonEnrichment = getLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
+    ?? getRoundTwoLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title);
   const activeQuiz = buildQuiz(activeQuest, activeLessonEnrichment?.quiz ?? null);
   const completedCount = trackCompleted.length;
   const progressPercent = Math.round((completedCount / activeQuests.length) * 100);
