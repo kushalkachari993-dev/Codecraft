@@ -6,6 +6,7 @@ import { buildRoundThreePythonChallenge, buildRoundThreeSQLChallenge } from "./r
 import { buildRoundFourPythonChallenge, buildRoundFourSQLChallenge } from "./round4-challenges";
 import { buildRoundFivePythonChallenge, buildRoundFiveSQLChallenge } from "./round5-challenges";
 import { buildRoundSixPythonChallenge, buildRoundSixSQLChallenge } from "./round6-challenges";
+import { buildRoundSevenPythonChallenge, buildRoundSevenSQLChallenge } from "./round7-challenges";
 
 export type TopicChallenge = {
   title: string;
@@ -176,6 +177,8 @@ export function buildPythonChallenge(topic: PythonTopic, options: ChallengeOptio
   if (roundFiveChallenge) return roundFiveChallenge;
   const roundSixChallenge = buildRoundSixPythonChallenge(topic, options);
   if (roundSixChallenge) return roundSixChallenge;
+  const roundSevenChallenge = buildRoundSevenPythonChallenge(topic, options);
+  if (roundSevenChallenge) return roundSevenChallenge;
   if (options.required) {
     const worldName = options.worldName ?? "CodeCraft world";
     return {
@@ -292,6 +295,8 @@ export function buildSQLChallenge(topic: SQLTopic, options: ChallengeOptions = {
   if (roundFiveChallenge) return roundFiveChallenge;
   const roundSixChallenge = buildRoundSixSQLChallenge(topic, options);
   if (roundSixChallenge) return roundSixChallenge;
+  const roundSevenChallenge = buildRoundSevenSQLChallenge(topic, options);
+  if (roundSevenChallenge) return roundSevenChallenge;
   if (options.required) {
     const worldName = options.worldName ?? "CodeCraft world";
     return {
