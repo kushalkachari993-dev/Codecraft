@@ -3,6 +3,7 @@ import type { SQLTopic } from "./sql-curriculum";
 import type { ChallengeRuntimeSpec } from "./execution/types";
 import { buildRoundTwoPythonChallenge, buildRoundTwoSQLChallenge } from "./round2-challenges";
 import { buildRoundThreePythonChallenge, buildRoundThreeSQLChallenge } from "./round3-challenges";
+import { buildRoundFourPythonChallenge, buildRoundFourSQLChallenge } from "./round4-challenges";
 
 export type TopicChallenge = {
   title: string;
@@ -167,6 +168,8 @@ export function buildPythonChallenge(topic: PythonTopic, options: ChallengeOptio
   if (roundTwoChallenge) return roundTwoChallenge;
   const roundThreeChallenge = buildRoundThreePythonChallenge(topic, options);
   if (roundThreeChallenge) return roundThreeChallenge;
+  const roundFourChallenge = buildRoundFourPythonChallenge(topic, options);
+  if (roundFourChallenge) return roundFourChallenge;
   if (options.required) {
     const worldName = options.worldName ?? "CodeCraft world";
     return {
@@ -279,6 +282,8 @@ export function buildSQLChallenge(topic: SQLTopic, options: ChallengeOptions = {
   const roundThreeChallenge = buildRoundThreeSQLChallenge(topic, options);
   if (roundThreeChallenge) return roundThreeChallenge;
     const worldName = options.worldName ?? "CodeCraft world";
+  const roundFourChallenge = buildRoundFourSQLChallenge(topic, options);
+  if (roundFourChallenge) return roundFourChallenge;
     return {
       title: worldName + " SQL project",
       instructions: "Create a view named world_relay_report with one row per sector. It must expose sector_name, relay_count, and avg_power, preserve sectors with no relays, and order the final report by sector_name. This required database project gates the next world.",

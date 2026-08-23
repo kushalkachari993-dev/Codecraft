@@ -1,5 +1,6 @@
 import { buildRoundTwoGenAILab } from "./round2-genai-labs";
 import { buildRoundThreeGenAILab } from "./round3-genai-labs";
+import { buildRoundFourGenAILab } from "./round4-genai-labs";
 
 export type GenAIPaceId = "beginner" | "intermediate" | "expert";
 
@@ -194,6 +195,8 @@ export function buildGenAILab(topic: GenAITopic, required = false, worldName = "
   if (roundTwoLab) return roundTwoLab;
   const roundThreeLab = buildRoundThreeGenAILab(topic, required, worldName);
   if (roundThreeLab) return roundThreeLab;
+  const roundFourLab = buildRoundFourGenAILab(topic, required, worldName);
+  if (roundFourLab) return roundFourLab;
   const family = AUTHORED_BEGINNER_LABS[topic.title]
     ?? GENAI_LAB_FAMILIES.find((item) => item.pattern.test(topic.title))?.spec
     ?? DEFAULT_GENAI_LAB;
