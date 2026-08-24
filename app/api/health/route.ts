@@ -1,24 +1,15 @@
-import { env } from "cloudflare:workers";
-import type { ClerkRuntimeEnvironment } from "../../clerk-config";
+import { getCloudflareEnvironment, getProgressRepository } from "../../../infrastructure/cloudflare/runtime";
 
 export const dynamic = "force-dynamic";
-
-type HealthEnvironment = ClerkRuntimeEnvironment & {
-  DB?: D1Database;
-  AI?: unknown;
-};
 
 export async function GET() {
   const requestId = crypto.randomUUID();
   const checkedAt = new Date().toISOString();
-  const runtimeEnvironment = env as unknown as HealthEnvironment;
+  const runtimeEnvironment = getCloudflareEnvironment();
   let database = false;
 
   try {
-    const row = await runtimeEnvironment.DB?.prepare(
-      "SELECT COUNT(*) AS table_count FROM sqlite_schema WHERE type = 'table' AND name IN ('learners', 'progress_snapshots', 'code_submissions', 'ai_review_usage')",
-    ).first<{ table_count: number }>();
-    database = Number(row?.table_count) === 4;
+    database = await getProgressRepository().healthCheck();
   } catch (error) {
     console.error(JSON.stringify({
       event: "health_database_failed",

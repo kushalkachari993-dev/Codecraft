@@ -87,11 +87,51 @@ type Track = {
   nextWorld: string;
 };
 
+type JourneyPreferences = {
+  trackId: Track["id"];
+  paceId: PythonPaceId;
+  started: boolean;
+  tutorialComplete: boolean;
+};
+
 const TRACKS: Track[] = [
   { id: "python", label: "Python", world: "Logic Highlands", worldTwo: "The Function Relay", kicker: "PYTHON TRAIL", description: "Learn programming foundations while Byte restores the living systems of the Code Realms.", outcome: "Commands · Loops · Functions · Collections", mission: "Repair the Logic Relay and reconnect every automation node.", energy: "Lumen shards", icon: "Py", nextWorld: "Object Odyssey" },
   { id: "genai", label: "GenAI", world: "Prompt Frontier", worldTwo: "The Agent Foundry", kicker: "AI EXPLORER TRAIL", description: "Learn how to prompt, guide, structure, and evaluate intelligent systems across a fractured signal frontier.", outcome: "Prompts · Grounding · Tools · Evaluation", mission: "Rebuild the Signal Archive and teach its agents to respond reliably.", energy: "Echo cores", icon: "AI", nextWorld: "Multimodal Metropolis" },
   { id: "sql", label: "SQL", world: "Data Depths", worldTwo: "The Analytics Citadel", kicker: "DATABASE TRAIL", description: "Explore a buried data realm using queries that reveal, connect, and analyze its records.", outcome: "SELECT · JOIN · Subqueries · Windows", mission: "Restore the Data Nexus and recover the realm's lost records.", energy: "Index crystals", icon: "DB", nextWorld: "Performance Nexus" },
 ];
+
+const JOURNEY_STORAGE_KEY = "codecraft-journey-v1";
+const DEFAULT_JOURNEY: JourneyPreferences = { trackId: "python", paceId: "beginner", started: false, tutorialComplete: false };
+const TRACK_MATCH: Record<Track["id"], string> = {
+  python: "Best for programming foundations, automation, APIs, and backend development.",
+  genai: "Best for prompts, RAG, agents, evaluation, and production AI applications.",
+  sql: "Best for analytics, databases, data engineering, and performance work.",
+};
+const PACE_MATCH: Record<PythonPaceId, string> = {
+  beginner: "New to the subject or rebuilding foundations",
+  intermediate: "Comfortable with the basics and ready to build",
+  expert: "Preparing for production systems and architecture",
+};
+
+function loadJourneyPreferences(): JourneyPreferences {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(JOURNEY_STORAGE_KEY) ?? "{}") as Partial<JourneyPreferences>;
+    const trackId = parsed.trackId === "genai" || parsed.trackId === "sql" ? parsed.trackId : "python";
+    const paceId = parsed.paceId === "intermediate" || parsed.paceId === "expert" ? parsed.paceId : "beginner";
+    return { trackId, paceId, started: parsed.started === true, tutorialComplete: parsed.tutorialComplete === true };
+  } catch {
+    return DEFAULT_JOURNEY;
+  }
+}
+
+function FirstRunChecklist({ activeStep }: { activeStep: number }) {
+  const steps = ["Choose a track", "Set your pace", "Learn the game loop", "Complete your first lesson"];
+  return (
+    <ol className="first-run-checklist" aria-label="Getting started progress">
+      {steps.map((step, index) => <li className={index < activeStep ? "done" : index === activeStep ? "active" : ""} key={step}><span>{index < activeStep ? "OK" : index + 1}</span><strong>{step}</strong></li>)}
+    </ol>
+  );
+}
 
 const AVATARS: Array<{ id: AvatarId; name: string; glyph: string; description: string; unlockAt: number }> = [
   { id: "relay-scout", name: "Relay Scout", glyph: "◇", description: "Fast, curious, and tuned to hidden signals.", unlockAt: 0 },
@@ -448,6 +488,12 @@ export default function Home() {
   const [submissionsState, setSubmissionsState] = useState<SubmissionsState>("idle");
   const [storyStep, setStoryStep] = useState(0);
   const [gameToast, setGameToast] = useState("");
+  const [journey, setJourney] = useState<JourneyPreferences>(DEFAULT_JOURNEY);
+  const [goalRecommendation, setGoalRecommendation] = useState<Track["id"]>("python");
+  const [paceRecommendation, setPaceRecommendation] = useState<PythonPaceId>("beginner");
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const [firstWorldCelebration, setFirstWorldCelebration] = useState(false);
   const clerkDisplayName = clerkProfile?.fullName
     ?? clerkProfile?.firstName
     ?? clerkProfile?.primaryEmailAddress?.emailAddress
@@ -508,6 +554,9 @@ export default function Home() {
   const nextQuest = pendingRequiredProject ?? activeQuests.find((quest) => !trackCompleted.includes(quest.id));
   const pathComplete = completedCount === activeQuests.length && requiredProjectIds.every((id) => trackBonus.includes(id));
   const totalBadges = Object.values(progress.completed).reduce((total, ids) => total + ids.length, 0);
+  const savedTrack = TRACKS.find((track) => track.id === journey.trackId) ?? TRACKS[0];
+  const savedTrackPaces = savedTrack.id === "python" ? PYTHON_PACES : savedTrack.id === "genai" ? GENAI_PACES : SQL_PACES;
+  const savedPace = savedTrackPaces.find((pace) => pace.id === journey.paceId) ?? savedTrackPaces[0];
   const profileDisplayName = clerkSignedIn ? clerkDisplayName : "Relay Apprentice";
   const profileInitial = profileDisplayName.trim().charAt(0).toUpperCase() || "R";
   const levelProgress = Math.max(0, progress.xp - 120) % 100;
@@ -591,6 +640,28 @@ export default function Home() {
   const earnedBadges = activeQuests.filter((quest) => trackCompleted.includes(quest.id)).map((quest) => quest.badge);
 
   useEffect(() => {
+    const restoreTimer = window.setTimeout(() => {
+      const savedJourney = loadJourneyPreferences();
+      setJourney(savedJourney);
+      setGoalRecommendation(savedJourney.trackId);
+      setPaceRecommendation(savedJourney.paceId);
+      if (!savedJourney.started) return;
+      setActiveTrackId(savedJourney.trackId);
+      if (savedJourney.trackId === "python") {
+        setActivePythonPaceId(savedJourney.paceId);
+        setHasChosenPythonPace(true);
+      } else if (savedJourney.trackId === "genai") {
+        setActiveGenAIPaceId(savedJourney.paceId);
+        setHasChosenGenAIPace(true);
+      } else {
+        setActiveSQLPaceId(savedJourney.paceId);
+        setHasChosenSQLPace(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, []);
+
+  useEffect(() => {
     if (!clerkLoaded) return;
     const controller = new AbortController();
     const localProgress = loadProgress();
@@ -668,6 +739,22 @@ export default function Home() {
   }, [profileOpen]);
 
   useEffect(() => {
+    if (!tutorialOpen && !firstWorldCelebration) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setTutorialOpen(false);
+      setFirstWorldCelebration(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [firstWorldCelebration, tutorialOpen]);
+
+  useEffect(() => {
     if (!profileOpen || !clerkSignedIn) return;
     const controller = new AbortController();
     void Promise.resolve()
@@ -701,6 +788,11 @@ export default function Home() {
     window.localStorage.setItem("codecraft-progress-v3", JSON.stringify(normalized));
     window.localStorage.setItem("codecraft-xp", String(normalized.xp));
     setProgress(normalized);
+  };
+
+  const persistJourney = (next: JourneyPreferences) => {
+    window.localStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify(next));
+    setJourney(next);
   };
 
   const playGameSound = (kind: "select" | "complete" | "boss" = "select") => {
@@ -858,6 +950,51 @@ export default function Home() {
     setExecutionResult(null);
   };
 
+  const resumeJourney = () => {
+    let destination = journey;
+    if (!destination.started) {
+      const bestProgress = Object.entries(progress.completed)
+        .filter(([key]) => key.includes("-"))
+        .sort((left, right) => right[1].length - left[1].length)[0];
+      if (bestProgress) {
+        const [trackId, paceId] = bestProgress[0].split("-");
+        destination = {
+          trackId: trackId === "genai" || trackId === "sql" ? trackId : "python",
+          paceId: paceId === "intermediate" || paceId === "expert" ? paceId : "beginner",
+          started: true,
+          tutorialComplete: true,
+        };
+      } else {
+        destination = { trackId: goalRecommendation, paceId: paceRecommendation, started: true, tutorialComplete: false };
+      }
+    }
+    setActiveTrackId(destination.trackId);
+    if (destination.trackId === "python") {
+      setActivePythonPaceId(destination.paceId);
+      setHasChosenPythonPace(true);
+    } else if (destination.trackId === "genai") {
+      setActiveGenAIPaceId(destination.paceId);
+      setHasChosenGenAIPace(true);
+    } else {
+      setActiveSQLPaceId(destination.paceId);
+      setHasChosenSQLPace(true);
+    }
+    persistJourney(destination);
+    setView("roadmap");
+  };
+
+  const skipTutorial = () => {
+    persistJourney({ ...journey, trackId: activeTrack.id, paceId: activePaceId, started: true, tutorialComplete: true });
+    setTutorialOpen(false);
+    setView("roadmap");
+  };
+
+  const startFirstLesson = () => {
+    persistJourney({ ...journey, trackId: activeTrack.id, paceId: activePaceId, started: true, tutorialComplete: true });
+    setTutorialOpen(false);
+    openQuest(activeQuests[0]);
+  };
+
   const updateRuntimeReadiness = (track: RuntimeWorkerTrack, readiness: RuntimeReadiness) => {
     setRuntimeReadiness((current) => ({ ...current, [track]: readiness }));
   };
@@ -883,6 +1020,8 @@ export default function Home() {
   const selectTrack = (track: Track) => {
     clearRun();
     setActiveTrackId(track.id);
+    setGoalRecommendation(track.id);
+    persistJourney({ ...journey, trackId: track.id });
     if (track.id === "python" || track.id === "genai" || track.id === "sql") {
       if (track.id === "python") setHasChosenPythonPace(false);
       if (track.id === "genai") setHasChosenGenAIPace(false);
@@ -925,6 +1064,10 @@ export default function Home() {
     setLessonStage("theory");
     setQuizAnswers({});
     setQuizResult("idle");
+    const nextJourney = { trackId: paceTrackId, paceId, started: true, tutorialComplete: journey.tutorialComplete };
+    persistJourney(nextJourney);
+    setTutorialStep(0);
+    if (!journey.tutorialComplete && totalBadges === 0 && completed.length === 0) setTutorialOpen(true);
     setView("roadmap");
   };
 
@@ -1122,6 +1265,7 @@ export default function Home() {
       setTerminal("> Run required\n! Execute the current solution successfully before submitting it.");
       return;
     }
+    const firstWorldRestoredNow = isRequiredWorldProject && currentModule.number === 1 && !trackBonus.includes(activeQuest.id);
     if (!trackBonus.includes(activeQuest.id)) {
       const nextProgress: PlayerProgress = {
         ...progress,
@@ -1137,6 +1281,7 @@ export default function Home() {
     setTerminal(isRequiredWorldProject
       ? "> Applied project complete!\n+ 75 project XP earned. " + (isFinalQuest ? "This path is complete." : "The next world is unlocked.")
       : "> Optional challenge complete!\n+ " + bonusXp + " bonus XP earned.");
+    if (firstWorldRestoredNow) setFirstWorldCelebration(true);
   };
 
   const openNextSection = () => {
@@ -1171,6 +1316,67 @@ export default function Home() {
       </header>
 
       {gameToast && <div className="game-toast" role="status"><span>✦</span><strong>{gameToast}</strong><button onClick={() => setGameToast("")} aria-label="Dismiss reward notification">×</button></div>}
+
+      {tutorialOpen && (
+        <div className="onboarding-backdrop">
+          <section className="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+            <header>
+              <div><span>BYTE&apos;S QUICK START</span><strong>About 60 seconds</strong></div>
+              <button onClick={skipTutorial} aria-label="Skip tutorial">Skip</button>
+            </header>
+            <FirstRunChecklist activeStep={2} />
+            <div className="onboarding-progress"><i style={{ width: `${((tutorialStep + 1) / 3) * 100}%` }} /></div>
+            {tutorialStep === 0 ? (
+              <div className="onboarding-slide">
+                <p>MISSION 01 / 03</p>
+                <h2 id="onboarding-title">Your learning path is ready.</h2>
+                <span>You chose <b>{activeTrack.label}</b> at the <b>{activePace.label}</b> pace. Your first world is <b>{activeModules[0].name}</b>.</span>
+                <div className="onboarding-mission-card"><small>FIRST OBJECTIVE</small><strong>{activeQuests[0].title}</strong><p>{activeQuests[0].objective}</p></div>
+              </div>
+            ) : tutorialStep === 1 ? (
+              <div className="onboarding-slide">
+                <p>MISSION 02 / 03</p>
+                <h2 id="onboarding-title">Every lesson follows one clear route.</h2>
+                <div className="onboarding-loop">
+                  <article><b>1</b><strong>Learn</strong><span>Understand the idea through rich theory.</span></article>
+                  <article><b>2</b><strong>Example</strong><span>See the concept explained line by line.</span></article>
+                  <article><b>3</b><strong>Checkpoint</strong><span>Pass a short required knowledge test.</span></article>
+                  <article><b>4</b><strong>Practice</strong><span>Try optional code; world projects remain required.</span></article>
+                </div>
+              </div>
+            ) : (
+              <div className="onboarding-slide">
+                <p>MISSION 03 / 03</p>
+                <h2 id="onboarding-title">Repair systems and watch the realm respond.</h2>
+                <div className="reward-explainer">
+                  <article><span>XP</span><strong>Grow your level</strong><p>Lessons, labs, and daily missions earn signal XP.</p></article>
+                  <article><span>BADGE</span><strong>Prove each topic</strong><p>A passed checkpoint restores its topic badge.</p></article>
+                  <article><span>WORLD</span><strong>Defeat the project</strong><p>The final project in each world unlocks the next gate.</p></article>
+                </div>
+              </div>
+            )}
+            <footer>
+              <button disabled={tutorialStep === 0} onClick={() => setTutorialStep((step) => Math.max(0, step - 1))}>Back</button>
+              {tutorialStep < 2
+                ? <button className="onboarding-primary" onClick={() => setTutorialStep((step) => Math.min(2, step + 1))}>Next</button>
+                : <button className="onboarding-primary" onClick={startFirstLesson}>Start first lesson</button>}
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {firstWorldCelebration && (
+        <div className="onboarding-backdrop celebration-backdrop">
+          <section className="world-celebration" role="dialog" aria-modal="true" aria-labelledby="world-celebration-title">
+            <div className="celebration-burst" aria-hidden="true"><i /><i /><i /><span>01</span></div>
+            <p>FIRST WORLD RESTORED</p>
+            <h2 id="world-celebration-title">{currentModule.name} is back online!</h2>
+            <span>You completed every checkpoint and defeated the world project. The next realm gate is now open.</span>
+            <div><article><small>PROJECT REWARD</small><strong>+75 XP</strong></article><article><small>ARTIFACT</small><strong>{activeTrack.label} Relay Core</strong></article></div>
+            <footer><button onClick={() => { setFirstWorldCelebration(false); setView("roadmap"); }}>View restored world</button><button className="onboarding-primary" onClick={() => { setFirstWorldCelebration(false); openNextSection(); }}>{activeModules[1] ? `Enter ${activeModules[1].name}` : "Finish path"}</button></footer>
+          </section>
+        </div>
+      )}
 
       {profileOpen && (
         <div className="profile-backdrop">
@@ -1287,6 +1493,21 @@ export default function Home() {
             <h1>Repair the Core Relay.<br /><span>Master real code.</span></h1>
             <p>The Code Realms have fallen out of sync. Join Byte, restore their systems one concept at a time, and turn knowledge into power.</p>
           </div>
+          {(journey.started || totalBadges > 0) && (
+            <section className="journey-resume">
+              <div><span>CONTINUE YOUR JOURNEY</span><h2>{journey.started ? `${savedTrack.label} / ${savedPace.label}` : "Return to your most active path"}</h2><p>Your next unlocked topic, world project, and rewards are waiting.</p></div>
+              <button onClick={resumeJourney}>Continue where I left off</button>
+            </section>
+          )}
+          {totalBadges === 0 && <FirstRunChecklist activeStep={0} />}
+          <section className="track-recommender" aria-labelledby="track-recommender-title">
+            <div><p>NEED A RECOMMENDATION?</p><h2 id="track-recommender-title">What do you want to build?</h2></div>
+            <div>
+              <button className={goalRecommendation === "python" ? "active" : ""} onClick={() => setGoalRecommendation("python")}><strong>Programming foundations</strong><span>Software, automation, APIs</span></button>
+              <button className={goalRecommendation === "genai" ? "active" : ""} onClick={() => setGoalRecommendation("genai")}><strong>AI applications</strong><span>RAG, agents, evaluation</span></button>
+              <button className={goalRecommendation === "sql" ? "active" : ""} onClick={() => setGoalRecommendation("sql")}><strong>Data systems</strong><span>Analysis, databases, scale</span></button>
+            </div>
+          </section>
           <div className="track-grid">
             {TRACKS.map((track) => {
               const trackPaces = track.id === "python" ? PYTHON_PACES : track.id === "genai" ? GENAI_PACES : SQL_PACES;
@@ -1294,13 +1515,15 @@ export default function Home() {
               const completed = trackPaces.reduce((sum, pace) => sum + (progress.completed[`${track.id}-${pace.id}`]?.length ?? 0), 0);
               const percent = Math.round((completed / total) * 100);
               return (
-                <article className={`track-card ${track.id}`} key={track.id}>
+                <article className={`track-card ${track.id} ${goalRecommendation === track.id ? "recommended" : ""}`} key={track.id}>
                   <div className="track-art" aria-hidden="true"><span>{track.icon}</span><i /><i /></div>
                   <div className="track-card-body">
+                    {goalRecommendation === track.id && <div className="recommendation-badge">RECOMMENDED FOR YOUR GOAL</div>}
                     <p>{track.kicker}</p>
                     <h2>{track.label}</h2>
                     <strong>Beginner · Intermediate · Expert</strong>
                     <span>{track.description}</span>
+                    <div className="track-fit"><small>BEST FIT</small><strong>{TRACK_MATCH[track.id]}</strong></div>
                     <div className="realm-signature"><small>REALM MISSION</small><p>{track.mission}</p><b>◆ {track.energy}</b></div>
                     <div className="track-skills">{track.outcome.split(" · ").map((skill) => <small key={skill}>{skill}</small>)}</div>
                     <div className="track-card-progress"><div><i style={{ width: `${percent}%` }} /></div><span>{completed}/{total} topics</span></div>
@@ -1325,14 +1548,23 @@ export default function Home() {
             <h1>Choose your<br /><span>{activeTrack.label} pace</span></h1>
             <p>Start where you are. You can switch paths at any time, and progress is saved separately for every level.</p>
           </div>
+          {totalBadges === 0 && <FirstRunChecklist activeStep={1} />}
+          <section className="pace-recommender" aria-labelledby="pace-recommender-title">
+            <div><p>PACE FINDER</p><h2 id="pace-recommender-title">How familiar are you with {activeTrack.label}?</h2></div>
+            <div>
+              {(Object.keys(PACE_MATCH) as PythonPaceId[]).map((paceId) => <button className={paceRecommendation === paceId ? "active" : ""} onClick={() => setPaceRecommendation(paceId)} key={paceId}><strong>{paceId}</strong><span>{PACE_MATCH[paceId]}</span></button>)}
+            </div>
+            <p>Recommended path: <strong>{paceRecommendation[0].toUpperCase() + paceRecommendation.slice(1)}</strong>. You can switch later without losing progress.</p>
+          </section>
           <div className="pace-grid">
             {activePaces.map((pace, index) => {
               const completed = progress.completed[`${activeTrack.id}-${pace.id}`]?.length ?? 0;
               const percent = Math.round((completed / pace.topics.length) * 100);
               return (
-                <article className={`pace-card ${pace.id}`} key={pace.id}>
+                <article className={`pace-card ${pace.id} ${paceRecommendation === pace.id ? "recommended" : ""}`} key={pace.id}>
                   <div className="pace-card-art" aria-hidden="true"><span>{index + 1}</span><i /><i /><b>{pace.estimatedLevel}</b></div>
                   <div className="pace-card-body">
+                    {paceRecommendation === pace.id && <div className="recommendation-badge">RECOMMENDED START</div>}
                     <div className="pace-tier"><span>PATH {String(index + 1).padStart(2, "0")}</span><small>{pace.topics.length} TOPICS</small></div>
                     <h2>{pace.label}</h2>
                     <strong>{pace.tagline}</strong>
@@ -1372,6 +1604,7 @@ export default function Home() {
             </div>
             <div className="hero-byte" aria-label="Byte the robot"><span>◆</span><b>BYTE</b></div>
           </section>
+          {totalBadges === 0 && <div className="roadmap-first-run"><FirstRunChecklist activeStep={2} /><p><strong>Your map is ready.</strong> Learn the game loop, then begin the first highlighted topic.</p></div>}
 
           <section className="realm-command-center" aria-labelledby="realm-map-title">
             <header className="realm-command-header">
@@ -1486,6 +1719,8 @@ export default function Home() {
             <div className="lesson-progress"><i style={{ width: `${((activeQuest.id - 1) / activeQuests.length) * 100}%` }} /></div>
             <span>{activeQuest.id} / {activeQuests.length}</span>
           </div>
+
+          {totalBadges === 0 && activeQuest.id === 1 && <div className="lesson-first-run"><FirstRunChecklist activeStep={3} /></div>}
 
           <div className="curriculum-steps" aria-label="Lesson stages">
             {stageOrder.map((stage, index) => {

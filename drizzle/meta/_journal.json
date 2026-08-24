@@ -15,6 +15,13 @@
       "when": 1787388964217,
       "tag": "0001_warm_edwin_jarvis",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787595467659,
+      "tag": "0002_far_sharon_ventura",
+      "breakpoints": true
     }
   ]
 }

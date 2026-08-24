@@ -67,7 +67,7 @@ test("runs controlled GenAI lab evaluation without exposing a model credential",
   assert.equal(payload.tests.length, 4);
   assert.deepEqual(payload.tests.map((item) => item.name), ["Grounding", "Tool usage", "Safety", "Output quality"]);
   assert.match(payload.output, /Result: PASS/);
-  assert.match(payload.output, /Sign in to request one of three daily AI coaching reviews/);
+  assert.match(payload.output, /Sign in to request one of 3 daily AI coaching reviews/);
 });
 
 test("renders the privacy notice", async () => {
@@ -80,7 +80,7 @@ test("renders the privacy notice", async () => {
 });
 
 test("keeps the finished product free of starter-preview code", async () => {
-  const [page, layout, packageJson, pythonCurriculum, genaiCurriculum, sqlCurriculum, challenges, executionClient, pythonRunner, sqlRunner, worker, progressSource, progressRoute, submissionsRoute, schema, clerkAuth, clerkProvider, accountRoute, healthRoute, privacyPage, deleteAccountPage, migration, workerUrlNormalizer] = await Promise.all([
+  const [page, layout, packageJson, pythonCurriculum, genaiCurriculum, sqlCurriculum, challenges, executionClient, pythonRunner, sqlRunner, worker, serverConfig, workersAiAdapter, progressSource, progressRoute, d1Repository, submissionsRoute, schema, clerkAuth, clerkProvider, accountRoute, healthRoute, privacyPage, deleteAccountPage, migration, workerUrlNormalizer] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -92,8 +92,11 @@ test("keeps the finished product free of starter-preview code", async () => {
     readFile(new URL("../app/execution/python-runner.worker.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/execution/sql-runner.worker.ts", import.meta.url), "utf8"),
     readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../server/config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../infrastructure/cloudflare/workers-ai-evaluator.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/progress.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/progress/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../infrastructure/cloudflare/d1-progress-repository.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/submissions/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/clerk-auth.ts", import.meta.url), "utf8"),
@@ -179,7 +182,9 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(progressSource, /export function mergeProgress/);
   assert.match(progressSource, /Math\.max\(local\.xp, cloud\.xp\)/);
   assert.match(progressRoute, /getClerkUser/);
-  assert.match(progressRoute, /ON CONFLICT\(user_id\) DO UPDATE/);
+  assert.match(progressRoute, /getProgressRepository/);
+  assert.doesNotMatch(progressRoute, /ON CONFLICT\(user_id\) DO UPDATE/);
+  assert.match(d1Repository, /ON CONFLICT\(user_id\) DO UPDATE/);
   assert.match(progressRoute, /storage: "local"/);
   assert.match(clerkAuth, /authenticateRequest/);
   assert.match(clerkAuth, /authorizedParties/);
@@ -205,18 +210,23 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(page, /authorization: `Bearer \$\{token\}`/);
   assert.match(packageJson, /@clerk\/react/);
   assert.match(packageJson, /@clerk\/backend/);
-  assert.match(submissionsRoute, /code_submissions/);
-  assert.match(submissionsRoute, /crypto\.randomUUID/);
-  assert.match(submissionsRoute, /LIMIT 20/);
+  assert.match(submissionsRoute, /saveSubmission/);
+  assert.match(submissionsRoute, /listSubmissions/);
+  assert.doesNotMatch(submissionsRoute, /code_submissions|LIMIT 20/);
+  assert.match(d1Repository, /code_submissions/);
+  assert.match(d1Repository, /crypto\.randomUUID/);
+  assert.match(d1Repository, /LIMIT 20/);
   assert.match(schema, /progressSnapshots/);
   assert.match(schema, /codeSubmissions/);
   assert.match(schema, /aiReviewUsage/);
-  assert.match(worker, /AI_REVIEW_DAILY_LIMIT = 3/);
-  assert.match(worker, /INSERT INTO ai_review_usage/);
-  assert.match(worker, /llama-3\.1-8b-instruct-fp8-fast/);
+  assert.match(serverConfig, /CODECRAFT_AI_REVIEW_DAILY_LIMIT/);
+  assert.match(serverConfig, /aiReviewDailyLimit: boundedInteger/);
+  assert.match(d1Repository, /INSERT INTO ai_review_usage/);
+  assert.match(serverConfig, /llama-3\.1-8b-instruct-fp8-fast/);
   assert.match(worker, /getClerkUser\(request, env\)/);
   assert.match(executionClient, /request\.authToken/);
-  assert.match(accountRoute, /DELETE FROM ai_review_usage/);
+  assert.match(accountRoute, /deleteLearnerData/);
+  assert.match(d1Repository, /DELETE FROM ai_review_usage/);
   assert.match(accountRoute, /clerk\.users\.deleteUser/);
   assert.match(healthRoute, /status === "healthy" \? 200 : 503/);
   assert.match(privacyPage, /What CodeCraft stores/);
@@ -261,8 +271,10 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(sqlRunner, /CREATE TABLE relays/);
   assert.match(sqlRunner, /gradeSQL/);
   assert.match(worker, /\/api\/genai-lab/);
-  assert.match(worker, /env\.AI\.run/);
-  assert.match(worker, /UNTRUSTED_SUBMISSION/);
+  assert.match(worker, /WorkersAiEvaluator/);
+  assert.doesNotMatch(worker, /env\.AI\.run/);
+  assert.match(workersAiAdapter, /this\.binding\.run/);
+  assert.match(workersAiAdapter, /UNTRUSTED_SUBMISSION/);
   assert.doesNotMatch(page + executionClient, /API_KEY|CLERK_SECRET_KEY|sk_(?:test|live)_/i);
   assert.match(sqlCurriculum, /label: "Beginner"/);
   assert.match(sqlCurriculum, /label: "Intermediate"/);

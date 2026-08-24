@@ -40,3 +40,9 @@ export const aiReviewUsage = sqliteTable("ai_review_usage", {
 }, (table) => [
   primaryKey({ columns: [table.userId, table.usageDate] }),
 ]);
+
+export const schemaMigrations = sqliteTable("schema_migrations", {
+  version: integer("version").primaryKey(),
+  name: text("name").notNull(),
+  appliedAt: integer("applied_at").notNull(),
+});
