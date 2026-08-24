@@ -6,6 +6,7 @@ import { buildRoundSixGenAILab } from "./round6-genai-labs";
 import { buildRoundSevenGenAILab } from "./round7-genai-labs";
 import { buildRoundEightGenAILab } from "./round8-genai-labs";
 import { buildRoundNineGenAILab } from "./round9-genai-labs";
+import { buildRoundTenGenAILab } from "./round10-genai-labs";
 
 export type GenAIPaceId = "beginner" | "intermediate" | "expert";
 
@@ -212,6 +213,8 @@ export function buildGenAILab(topic: GenAITopic, required = false, worldName = "
   if (roundEightLab) return roundEightLab;
   const roundNineLab = buildRoundNineGenAILab(topic, required, worldName);
   if (roundNineLab) return roundNineLab;
+  const roundTenLab = buildRoundTenGenAILab(topic, required, worldName);
+  if (roundTenLab) return roundTenLab;
   const family = AUTHORED_BEGINNER_LABS[topic.title]
     ?? GENAI_LAB_FAMILIES.find((item) => item.pattern.test(topic.title))?.spec
     ?? DEFAULT_GENAI_LAB;

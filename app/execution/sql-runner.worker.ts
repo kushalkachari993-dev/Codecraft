@@ -64,8 +64,8 @@ INSERT INTO alerts VALUES (1, 3, true, 'high'), (2, 1, false, 'low');
 INSERT INTO users VALUES (1, 'Nova', 'nova@example.test', true), (2, 'Kiro', 'kiro@example.test', true), (3, 'Mira', 'mira@example.test', false);
 INSERT INTO orders VALUES (101, 1, 125.50, 'paid', now() - interval '3 days'), (102, 1, 42.00, 'open', now()), (103, 2, 310.25, 'paid', now() - interval '1 day');
 INSERT INTO relay_events VALUES
-  (1, 1, 'online', now() - interval '2 days', '{"source":"repair"}'),
-  (2, 3, 'offline', now() - interval '4 hours', '{"source":"sensor"}');
+  (1, 1, 'online', now() - interval '2 days', '{"source":"repair","severity":"low","temperature":66.0}'),
+  (2, 3, 'offline', now() - interval '4 hours', '{"source":"sensor-b","severity":"high","temperature":91.4}');
 `;
 
 type QueryResult = {
