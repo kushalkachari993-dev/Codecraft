@@ -11,6 +11,7 @@ import { buildRoundEightPythonChallenge, buildRoundEightSQLChallenge } from "./r
 import { buildRoundNinePythonChallenge, buildRoundNineSQLChallenge } from "./round9-challenges";
 import { buildRoundTenPythonChallenge, buildRoundTenSQLChallenge } from "./round10-challenges";
 import { buildRoundElevenPythonChallenge, buildRoundElevenSQLChallenge } from "./round11-challenges";
+import { buildRoundTwelvePythonChallenge, buildRoundTwelveSQLChallenge } from "./round12-challenges";
 
 export type TopicChallenge = {
   title: string;
@@ -191,6 +192,8 @@ export function buildPythonChallenge(topic: PythonTopic, options: ChallengeOptio
   if (roundTenChallenge) return roundTenChallenge;
   const roundElevenChallenge = buildRoundElevenPythonChallenge(topic, options);
   if (roundElevenChallenge) return roundElevenChallenge;
+  const roundTwelveChallenge = buildRoundTwelvePythonChallenge(topic, options);
+  if (roundTwelveChallenge) return roundTwelveChallenge;
   if (options.required) {
     const worldName = options.worldName ?? "CodeCraft world";
     return {
@@ -317,6 +320,8 @@ export function buildSQLChallenge(topic: SQLTopic, options: ChallengeOptions = {
   if (roundTenChallenge) return roundTenChallenge;
   const roundElevenChallenge = buildRoundElevenSQLChallenge(topic, options);
   if (roundElevenChallenge) return roundElevenChallenge;
+  const roundTwelveChallenge = buildRoundTwelveSQLChallenge(topic, options);
+  if (roundTwelveChallenge) return roundTwelveChallenge;
   if (options.required) {
     const worldName = options.worldName ?? "CodeCraft world";
     return {
