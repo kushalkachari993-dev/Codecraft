@@ -23,6 +23,7 @@ import { getRoundThirteenLessonEnrichment } from "./authored-lessons-round13";
 import { getRoundFourteenLessonEnrichment } from "./authored-lessons-round14";
 import { getRoundFifteenLessonEnrichment } from "./authored-lessons-round15";
 import { getRoundSixteenLessonEnrichment } from "./authored-lessons-round16";
+import { getRoundSeventeenLessonEnrichment } from "./authored-lessons-round17";
 import type { ExecutionResult, RuntimeProgress, RuntimeWorkerTrack } from "./execution/types";
 import { DEFAULT_PROGRESS, mergeProgress, normalizeProgress, type AvatarId, type PlayerProgress } from "./progress";
 
@@ -493,7 +494,8 @@ export default function Home() {
     ?? getRoundThirteenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
     ?? getRoundFourteenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
     ?? getRoundFifteenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundSixteenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title);
+    ?? getRoundSixteenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
+    ?? getRoundSeventeenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title);
   const activeQuiz = buildQuiz(activeQuest, activeLessonEnrichment?.quiz ?? null);
   const completedCount = trackCompleted.length;
   const progressPercent = Math.round((completedCount / activeQuests.length) * 100);
