@@ -1613,7 +1613,7 @@ export default function Home() {
                 <article className={`track-card ${track.id} ${goalRecommendation === track.id ? "recommended" : ""}`} key={track.id}>
                   <div className="track-art" aria-hidden="true"><span>{track.icon}</span><i /><i /></div>
                   <div className="track-card-body">
-                    {goalRecommendation === track.id && <div className="recommendation-badge">RECOMMENDED FOR YOUR GOAL</div>}
+                    <div className={"recommendation-badge " + (goalRecommendation === track.id ? "" : "recommendation-placeholder")} aria-hidden={goalRecommendation !== track.id}>RECOMMENDED FOR YOUR GOAL</div>
                     <p>{track.kicker}</p>
                     <h2>{track.label}</h2>
                     <strong>Beginner · Intermediate · Expert</strong>
@@ -1659,7 +1659,7 @@ export default function Home() {
                 <article className={`pace-card ${pace.id} ${paceRecommendation === pace.id ? "recommended" : ""}`} key={pace.id}>
                   <div className="pace-card-art" aria-hidden="true"><span>{index + 1}</span><i /><i /><b>{pace.estimatedLevel}</b></div>
                   <div className="pace-card-body">
-                    {paceRecommendation === pace.id && <div className="recommendation-badge">RECOMMENDED START</div>}
+                    <div className={"recommendation-badge " + (paceRecommendation === pace.id ? "" : "recommendation-placeholder")} aria-hidden={paceRecommendation !== pace.id}>RECOMMENDED START</div>
                     <div className="pace-tier"><span>PATH {String(index + 1).padStart(2, "0")}</span><small>{pace.topics.length} TOPICS</small></div>
                     <h2>{pace.label}</h2>
                     <strong>{pace.tagline}</strong>
