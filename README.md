@@ -33,13 +33,14 @@ The test command builds the production Worker and verifies rendered output, auth
 Application contracts are provider-neutral:
 
 - `server/repositories/progress-repository.ts`: learner progress, submissions, quotas, deletion, and health.
+- `server/repositories/analytics-repository.ts`: privacy-safe events, beta feedback, retention, and owner summaries.
 - `server/ai/ai-evaluator.ts`: hosted coaching evaluation.
 - `infrastructure/cloudflare/`: D1, Workers AI, runtime bindings, and migration adoption.
 - `worker/index.ts`: Cloudflare/vinext entry point.
 - `app/`: product UI, curriculum, browser runtimes, and API routes.
 - `drizzle/`: versioned SQL migration history.
 
-The current Cloudflare implementation can be replaced by implementing the two server interfaces and changing the composition root. Product UI, curriculum, Clerk authentication, Pyodide, and PGlite remain portable.
+The current Cloudflare implementation can be replaced by implementing the repository and AI interfaces and changing the composition root. Product UI, curriculum, Clerk authentication, Pyodide, and PGlite remain portable.
 
 ## Database commands
 
@@ -56,3 +57,5 @@ See [docs/PORTABILITY.md](docs/PORTABILITY.md) for services, variables, migratio
 ## Deployment configuration
 
 `.openai/hosting.json` declares the Sites project and D1 binding. Runtime configuration and secrets belong in the hosting environment, based on `.env.example`; real keys must never be committed.
+
+Set `CODECRAFT_ADMIN_USER_IDS` or `CODECRAFT_ADMIN_EMAILS` to a comma-separated Clerk allowlist before using `/admin/analytics`. The dashboard is protected server-side. Analytics uses predefined first-party events, keeps raw event rows for 90 days, and stores no code, prompts, answers, names, or emails in event records.

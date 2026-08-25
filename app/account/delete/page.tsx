@@ -25,7 +25,7 @@ export default function DeleteAccountPage() {
       });
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "Account deletion failed.");
-      for (const key of ["codecraft-progress-v3", "codecraft-progress-v2", "codecraft-xp"]) {
+      for (const key of ["codecraft-progress-v3", "codecraft-progress-v2", "codecraft-xp", "codecraft-analytics-session-v1"]) {
         window.localStorage.removeItem(key);
       }
       await clerk.signOut({ redirectUrl: "/" });
@@ -60,6 +60,7 @@ export default function DeleteAccountPage() {
               <li>Your CodeCraft learner profile and cloud progress</li>
               <li>Saved Python, SQL, and GenAI submissions</li>
               <li>Daily AI-review usage records</li>
+              <li>Analytics events and beta feedback linked to your account</li>
               <li>Your Clerk authentication account</li>
             </ul>
             <p>You are deleting <strong>{user?.primaryEmailAddress?.emailAddress ?? "the signed-in account"}</strong>. Local CodeCraft progress on this browser will also be cleared.</p>

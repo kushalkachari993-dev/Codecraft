@@ -1,4 +1,4 @@
-import { getCloudflareEnvironment, getProgressRepository } from "../../../infrastructure/cloudflare/runtime";
+import { getAnalyticsRepository, getCloudflareEnvironment, getProgressRepository } from "../../../infrastructure/cloudflare/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -7,9 +7,11 @@ export async function GET() {
   const checkedAt = new Date().toISOString();
   const runtimeEnvironment = getCloudflareEnvironment();
   let database = false;
+  let analytics = false;
 
   try {
     database = await getProgressRepository().healthCheck();
+    analytics = await getAnalyticsRepository().healthCheck();
   } catch (error) {
     console.error(JSON.stringify({
       event: "health_database_failed",
@@ -21,7 +23,7 @@ export async function GET() {
   const clerkPublishable = runtimeEnvironment.VITE_CLERK_PUBLISHABLE_KEY ?? "";
   const clerkSecret = runtimeEnvironment.CLERK_SECRET_KEY ?? "";
   const authentication = clerkPublishable.startsWith("pk_live_") && clerkSecret.startsWith("sk_live_");
-  const status = database && authentication ? "healthy" : "degraded";
+  const status = database && analytics && authentication ? "healthy" : "degraded";
 
   return Response.json({
     status,
@@ -29,6 +31,7 @@ export async function GET() {
     requestId,
     checks: {
       database,
+      analytics,
       authentication,
       aiEvaluator: runtimeEnvironment.AI ? "hosted" : "deterministic-fallback",
     },

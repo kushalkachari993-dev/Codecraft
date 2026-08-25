@@ -1,5 +1,5 @@
 import { getClerkUser, getCodeCraftClerkClient } from "../../clerk-auth";
-import { getCloudflareEnvironment, getProgressRepository } from "../../../infrastructure/cloudflare/runtime";
+import { getAnalyticsRepository, getCloudflareEnvironment, getProgressRepository } from "../../../infrastructure/cloudflare/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,7 @@ export async function DELETE(request: Request) {
   }
 
   try {
+    await getAnalyticsRepository().deleteUserData(user.userId);
     await getProgressRepository().deleteLearnerData(user.userId);
     await clerk.users.deleteUser(user.userId);
     console.info(JSON.stringify({ event: "account_deleted", requestId }));

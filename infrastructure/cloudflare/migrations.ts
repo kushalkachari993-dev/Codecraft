@@ -30,6 +30,21 @@ const migrations: D1Migration[] = [
     name: "schema_migration_tracking",
     statements: [],
   },
+  {
+    version: 4,
+    name: "beta_analytics_and_feedback",
+    statements: [
+      "CREATE TABLE IF NOT EXISTS analytics_events (event_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL, user_id TEXT, event_name TEXT NOT NULL, track TEXT, pace TEXT, topic_id INTEGER, world_number INTEGER, required INTEGER DEFAULT 0 NOT NULL, occurred_at INTEGER NOT NULL)",
+      "CREATE INDEX IF NOT EXISTS analytics_events_name_time_idx ON analytics_events(event_name, occurred_at)",
+      "CREATE INDEX IF NOT EXISTS analytics_events_session_time_idx ON analytics_events(session_id, occurred_at)",
+      "CREATE INDEX IF NOT EXISTS analytics_events_user_time_idx ON analytics_events(user_id, occurred_at)",
+      "CREATE INDEX IF NOT EXISTS analytics_events_time_idx ON analytics_events(occurred_at)",
+      "CREATE TABLE IF NOT EXISTS beta_feedback (feedback_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL, user_id TEXT, category TEXT NOT NULL, rating INTEGER NOT NULL, difficulty TEXT, message TEXT NOT NULL, contact_allowed INTEGER DEFAULT 0 NOT NULL, track TEXT, pace TEXT, topic_id INTEGER, world_number INTEGER, status TEXT DEFAULT 'new' NOT NULL, created_at INTEGER NOT NULL)",
+      "CREATE INDEX IF NOT EXISTS beta_feedback_created_idx ON beta_feedback(created_at)",
+      "CREATE INDEX IF NOT EXISTS beta_feedback_session_created_idx ON beta_feedback(session_id, created_at)",
+      "CREATE INDEX IF NOT EXISTS beta_feedback_user_created_idx ON beta_feedback(user_id, created_at)",
+    ],
+  },
 ];
 
 let schemaReady: Promise<void> | null = null;

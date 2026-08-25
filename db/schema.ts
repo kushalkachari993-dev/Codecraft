@@ -41,6 +41,45 @@ export const aiReviewUsage = sqliteTable("ai_review_usage", {
   primaryKey({ columns: [table.userId, table.usageDate] }),
 ]);
 
+export const analyticsEvents = sqliteTable("analytics_events", {
+  eventId: text("event_id").primaryKey(),
+  sessionId: text("session_id").notNull(),
+  userId: text("user_id"),
+  eventName: text("event_name").notNull(),
+  track: text("track"),
+  pace: text("pace"),
+  topicId: integer("topic_id"),
+  worldNumber: integer("world_number"),
+  required: integer("required", { mode: "boolean" }).notNull().default(false),
+  occurredAt: integer("occurred_at").notNull(),
+}, (table) => [
+  index("analytics_events_name_time_idx").on(table.eventName, table.occurredAt),
+  index("analytics_events_session_time_idx").on(table.sessionId, table.occurredAt),
+  index("analytics_events_user_time_idx").on(table.userId, table.occurredAt),
+  index("analytics_events_time_idx").on(table.occurredAt),
+]);
+
+export const betaFeedback = sqliteTable("beta_feedback", {
+  feedbackId: text("feedback_id").primaryKey(),
+  sessionId: text("session_id").notNull(),
+  userId: text("user_id"),
+  category: text("category").notNull(),
+  rating: integer("rating").notNull(),
+  difficulty: text("difficulty"),
+  message: text("message").notNull(),
+  contactAllowed: integer("contact_allowed", { mode: "boolean" }).notNull().default(false),
+  track: text("track"),
+  pace: text("pace"),
+  topicId: integer("topic_id"),
+  worldNumber: integer("world_number"),
+  status: text("status").notNull().default("new"),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [
+  index("beta_feedback_created_idx").on(table.createdAt),
+  index("beta_feedback_session_created_idx").on(table.sessionId, table.createdAt),
+  index("beta_feedback_user_created_idx").on(table.userId, table.createdAt),
+]);
+
 export const schemaMigrations = sqliteTable("schema_migrations", {
   version: integer("version").primaryKey(),
   name: text("name").notNull(),

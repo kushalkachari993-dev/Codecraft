@@ -26,6 +26,8 @@ import { getRoundSixteenLessonEnrichment } from "./authored-lessons-round16";
 import { getRoundSeventeenLessonEnrichment } from "./authored-lessons-round17";
 import type { ExecutionResult, RuntimeProgress, RuntimeWorkerTrack } from "./execution/types";
 import { DEFAULT_PROGRESS, mergeProgress, normalizeProgress, type AvatarId, type PlayerProgress } from "./progress";
+import BetaFeedback from "./beta-feedback";
+import { trackAnalyticsEvent, type AnalyticsContext, type AnalyticsEventName } from "./analytics-events";
 
 type RunState = "idle" | "running" | "ready" | "error" | "complete";
 type RuntimeReadiness = "idle" | "preparing" | "ready" | "error";
@@ -512,6 +514,7 @@ export default function Home() {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizResult, setQuizResult] = useState<"idle" | "incomplete" | "passed" | "failed">("idle");
   const runToken = useRef(0);
+  const analyticsSessionTracked = useRef(false);
   const executionAbort = useRef<AbortController | null>(null);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [executionPhase, setExecutionPhase] = useState("");
@@ -535,6 +538,7 @@ export default function Home() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [firstWorldCelebration, setFirstWorldCelebration] = useState(false);
+  const [worldFeedbackPrompt, setWorldFeedbackPrompt] = useState(false);
   const [worldPowerHint, setWorldPowerHint] = useState("");
   const [eliminatedQuizOptions, setEliminatedQuizOptions] = useState<Record<number, number[]>>({});
   const clerkDisplayName = clerkProfile?.fullName
@@ -692,6 +696,23 @@ export default function Home() {
   };
 
   const earnedBadges = activeQuests.filter((quest) => trackCompleted.includes(quest.id)).map((quest) => quest.badge);
+
+  const emitAnalytics = (eventName: AnalyticsEventName, override: AnalyticsContext = {}) => {
+    void trackAnalyticsEvent(eventName, {
+      track: activeTrack.id,
+      pace: activePaceId,
+      topicId: activeQuest.id,
+      worldNumber: currentModule.number,
+      required: isRequiredWorldProject,
+      ...override,
+    }, clerkSignedIn ? getToken : undefined);
+  };
+
+  useEffect(() => {
+    if (!clerkLoaded || analyticsSessionTracked.current) return;
+    analyticsSessionTracked.current = true;
+    void trackAnalyticsEvent("session_started", {}, clerkSignedIn ? getToken : undefined);
+  }, [clerkLoaded, clerkSignedIn, getToken]);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -1037,17 +1058,26 @@ export default function Home() {
       setHasChosenSQLPace(true);
     }
     persistJourney(destination);
+    emitAnalytics("journey_resumed", {
+      track: destination.trackId,
+      pace: destination.paceId,
+      topicId: undefined,
+      worldNumber: undefined,
+      required: undefined,
+    });
     setView("roadmap");
   };
 
   const skipTutorial = () => {
     persistJourney({ ...journey, trackId: activeTrack.id, paceId: activePaceId, started: true, tutorialComplete: true });
+    emitAnalytics("tutorial_completed", { topicId: undefined, worldNumber: undefined, required: undefined });
     setTutorialOpen(false);
     setView("roadmap");
   };
 
   const startFirstLesson = () => {
     persistJourney({ ...journey, trackId: activeTrack.id, paceId: activePaceId, started: true, tutorialComplete: true });
+    emitAnalytics("tutorial_completed", { topicId: undefined, worldNumber: undefined, required: undefined });
     setTutorialOpen(false);
     openQuest(activeQuests[0]);
   };
@@ -1075,6 +1105,7 @@ export default function Home() {
   };
 
   const selectTrack = (track: Track) => {
+    emitAnalytics("track_selected", { track: track.id, pace: undefined, topicId: undefined, worldNumber: undefined, required: undefined });
     clearRun();
     setActiveTrackId(track.id);
     setGoalRecommendation(track.id);
@@ -1102,6 +1133,7 @@ export default function Home() {
     const firstQuest = quests[0];
     const key = `${paceTrackId}-${paceId}`;
     const completed = progress.completed[key] ?? [];
+    emitAnalytics("pace_selected", { track: paceTrackId, pace: paceId, topicId: undefined, worldNumber: undefined, required: undefined });
     setActiveTrackId(paceTrackId);
     if (paceTrackId === "sql") {
       setActiveSQLPaceId(paceId);
@@ -1142,14 +1174,15 @@ export default function Home() {
 
   const openQuest = (quest: Quest, startAtProject = false) => {
     if (!isUnlocked(quest)) return;
+    const destinationModule = activeTrack.id === "python"
+      ? getPythonModule(activePythonPaceId, quest.id)
+      : activeTrack.id === "genai"
+        ? getGenAIModule(activeGenAIPaceId, quest.id)
+        : getSQLModule(activeSQLPaceId, quest.id);
     clearRun();
     setActiveQuestId(quest.id);
     if (startAtProject) {
-      const projectModule = activeTrack.id === "python"
-        ? getPythonModule(activePythonPaceId, quest.id)
-        : activeTrack.id === "genai"
-          ? getGenAIModule(activeGenAIPaceId, quest.id)
-          : getSQLModule(activeSQLPaceId, quest.id);
+      const projectModule = destinationModule;
       const projectLab = activeTrack.id === "genai" ? buildGenAILab(activeGenAIPace.topics[quest.id - 1], true, projectModule.name) : null;
       const projectChallenge = activeTrack.id === "python"
         ? buildPythonChallenge(activePythonPace.topics[quest.id - 1], { required: true, worldName: projectModule.name })
@@ -1175,6 +1208,11 @@ export default function Home() {
     setWorldPowerHint("");
     setEliminatedQuizOptions({});
     setView("quest");
+    emitAnalytics(startAtProject ? "lab_started" : "lesson_started", {
+      topicId: quest.id,
+      worldNumber: destinationModule.number,
+      required: startAtProject || undefined,
+    });
   };
 
   const enterWorld = (world: (typeof activeWorlds)[number]) => {
@@ -1202,6 +1240,7 @@ export default function Home() {
       if (validationError) {
         setStatus("error");
         setTerminal("> Lab needs work\n! " + validationError);
+        emitAnalytics("lab_run_failed");
         return;
       }
     }
@@ -1241,6 +1280,7 @@ export default function Home() {
     if (activeTrack.id !== "genai") updateRuntimeReadiness(activeTrack.id, result.runtime === "controlled-local" ? "error" : "ready");
     setExecutionResult(result);
     saveSubmission(result, "attempt");
+    emitAnalytics(result.passed ? "lab_run_passed" : "lab_run_failed");
 
     if (!result.passed) {
       setSceneStep(0);
@@ -1305,6 +1345,7 @@ export default function Home() {
       },
     });
     setGameToast(activeWorldMechanic.power.toUpperCase() + " DEPLOYED · RECHARGES TOMORROW");
+    emitAnalytics("world_power_used");
     playGameSound("select");
   };
 
@@ -1317,6 +1358,7 @@ export default function Home() {
     const score = activeQuiz.filter((question, index) => quizAnswers[index] === question.answer).length;
     if (score !== activeQuiz.length) {
       setQuizResult("failed");
+      emitAnalytics("checkpoint_failed");
       return;
     }
 
@@ -1333,6 +1375,7 @@ export default function Home() {
       playGameSound("complete");
     }
     setQuizResult("passed");
+    emitAnalytics("checkpoint_passed");
   };
 
   const openBonus = () => {
@@ -1352,6 +1395,7 @@ export default function Home() {
     setSceneStep(trackBonus.includes(activeQuest.id) ? activeQuest.steps : 0);
     setLessonStage("bonus");
     warmExecutionRuntime(activeTrack.id);
+    emitAnalytics("lab_started");
   };
 
   const submitBonus = () => {
@@ -1368,6 +1412,8 @@ export default function Home() {
         bonus: { ...progress.bonus, [progressKey]: [...trackBonus, activeQuest.id].sort((a, b) => a - b) },
       };
       persistProgress(recordGameActivity(nextProgress, "lab", isRequiredWorldProject));
+      emitAnalytics("lab_completed");
+      if (isRequiredWorldProject) emitAnalytics("world_completed");
       playGameSound(isRequiredWorldProject ? "boss" : "complete");
     }
     if (executionResult) saveSubmission(executionResult, "submitted");
@@ -1411,6 +1457,14 @@ export default function Home() {
       </header>
 
       {gameToast && <div className="game-toast" role="status"><span>✦</span><strong>{gameToast}</strong><button onClick={() => setGameToast("")} aria-label="Dismiss reward notification">×</button></div>}
+
+      <BetaFeedback
+        context={{ track: activeTrack.id, pace: activePaceId, topicId: activeQuest.id, worldNumber: currentModule.number, required: isRequiredWorldProject }}
+        getToken={getToken}
+        signedIn={Boolean(clerkSignedIn)}
+        worldPromptOpen={worldFeedbackPrompt}
+        onDismissWorldPrompt={() => setWorldFeedbackPrompt(false)}
+      />
 
       {tutorialOpen && (
         <div className="onboarding-backdrop">
@@ -1468,7 +1522,7 @@ export default function Home() {
             <h2 id="world-celebration-title">{currentModule.name} is back online!</h2>
             <span>You completed every checkpoint and defeated the world project. The next realm gate is now open.</span>
             <div><article><small>PROJECT REWARD</small><strong>+75 XP</strong></article><article><small>UNIQUE RELIC</small><strong>{currentModule.name} Relic</strong></article></div>
-            <footer><button onClick={() => { setFirstWorldCelebration(false); setView("roadmap"); }}>View restored world</button><button className="onboarding-primary" onClick={() => { setFirstWorldCelebration(false); openNextSection(); }}>{activeModules[1] ? `Enter ${activeModules[1].name}` : "Finish path"}</button></footer>
+            <footer><button onClick={() => { setFirstWorldCelebration(false); setWorldFeedbackPrompt(true); setView("roadmap"); }}>View restored world</button><button className="onboarding-primary" onClick={() => { setFirstWorldCelebration(false); setWorldFeedbackPrompt(true); openNextSection(); }}>{activeModules[1] ? `Enter ${activeModules[1].name}` : "Finish path"}</button></footer>
           </section>
         </div>
       )}
@@ -1576,7 +1630,7 @@ export default function Home() {
                 <SignInButton mode="modal"><button onClick={closeProfile}>Sign in to sync and edit name</button></SignInButton>
               )}
             </footer>
-            <div className="profile-policy-links"><a href="/privacy">Privacy</a><span>·</span><a href="/api/health">Service status</a></div>
+            <div className="profile-policy-links"><a href="/privacy">Privacy</a><span>·</span><a href="/api/health">Service status</a>{clerkSignedIn && <><span>·</span><a href="/admin/analytics">Owner insights</a></>}</div>
           </section>
         </div>
       )}

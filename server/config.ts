@@ -2,6 +2,8 @@ export interface CodeCraftEnvironment {
   CODECRAFT_AI_MODEL?: string;
   CODECRAFT_AI_REVIEW_DAILY_LIMIT?: string;
   CODECRAFT_GENAI_REQUESTS_PER_MINUTE?: string;
+  CODECRAFT_ADMIN_USER_IDS?: string;
+  CODECRAFT_ADMIN_EMAILS?: string;
 }
 
 export interface ServerConfig {
