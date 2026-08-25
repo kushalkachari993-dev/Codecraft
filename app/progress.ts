@@ -15,6 +15,7 @@ export type GameProfile = {
   dailyLabs: number;
   dailyClaimed: boolean;
   inventory: string[];
+  worldPowerClaims: string[];
   updatedAt: number;
 };
 
@@ -36,6 +37,7 @@ export const DEFAULT_GAME_PROFILE: GameProfile = {
   dailyLabs: 0,
   dailyClaimed: false,
   inventory: ["Signal Compass"],
+  worldPowerClaims: [],
   updatedAt: 0,
 };
 
@@ -72,6 +74,9 @@ function cleanGame(value: unknown): GameProfile {
     inventory: Array.isArray(source.inventory)
       ? [...new Set(source.inventory.filter((item): item is string => typeof item === "string" && item.length > 0 && item.length <= 80))].slice(0, 100)
       : [...DEFAULT_GAME_PROFILE.inventory],
+    worldPowerClaims: Array.isArray(source.worldPowerClaims)
+      ? [...new Set(source.worldPowerClaims.filter((item): item is string => typeof item === "string" && item.length > 0 && item.length <= 120))].slice(-300)
+      : [],
     updatedAt: typeof source.updatedAt === "number" && Number.isFinite(source.updatedAt) ? Math.max(0, Math.floor(source.updatedAt)) : 0,
   };
 }
@@ -109,6 +114,7 @@ export function mergeProgress(local: PlayerProgress, cloud: PlayerProgress): Pla
       dailyLabs: sameDailyDate ? Math.max(localGame.dailyLabs, cloudGame.dailyLabs) : newestGame.dailyLabs,
       dailyClaimed: sameDailyDate ? localGame.dailyClaimed || cloudGame.dailyClaimed : newestGame.dailyClaimed,
       inventory: [...new Set([...localGame.inventory, ...cloudGame.inventory])],
+      worldPowerClaims: [...new Set([...localGame.worldPowerClaims, ...cloudGame.worldPowerClaims])].slice(-300),
     },
   };
 }

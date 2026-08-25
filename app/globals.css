@@ -531,6 +531,56 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px
   .coding-station { min-height: 690px; }.editor-actions { flex-wrap: wrap; }.editor-actions > span { width: 100%; }.run-secondary, .submit-primary { flex: 1; }.quest-complete-banner { align-items: stretch; flex-direction: column; }.quest-complete-banner button { width: 100%; }
 }
 
+.world-contract { display: grid; grid-template-columns: minmax(250px, .9fr) minmax(0, 1.6fr); gap: 14px; margin: 18px 0; padding: 16px; background: linear-gradient(135deg, #0b1b28, #071018); border: 2px solid #2d6574; box-shadow: 5px 5px 0 #010609; }
+.world-contract-intro { display: grid; align-content: center; padding: 14px; background: #06141b; border-left: 4px solid var(--cyan); }
+.world-contract-intro small { color: var(--cyan); font: 850 7px/1 var(--font-geist-mono), monospace; letter-spacing: 1px; }
+.world-contract-intro h3 { margin: 8px 0 7px; font: 900 17px/1.15 var(--font-geist-mono), monospace; text-transform: uppercase; }
+.world-contract-intro p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.world-contract-intro > div { height: 7px; margin-top: 13px; padding: 2px; background: #010609; border: 1px solid #29444f; }
+.world-contract-intro > div i { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--lime)); }
+.world-contract ol { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.world-contract li { display: grid; grid-template-columns: auto 1fr; align-content: center; gap: 9px; min-height: 105px; padding: 12px; background: #091522; border: 1px solid #2a4052; }
+.world-contract li > span { display: grid; place-items: center; width: 28px; height: 28px; color: #8da0ae; background: #101d2a; border: 1px solid #3a5263; font: 900 9px/1 var(--font-geist-mono), monospace; }
+.world-contract li p { display: grid; gap: 5px; margin: 0; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.world-contract li strong { color: #e3ecf0; font: 800 9px/1.2 var(--font-geist-mono), monospace; text-transform: uppercase; }
+.world-contract li.done { background: #10261f; border-color: #507a42; }
+.world-contract li.done > span { color: #12200c; background: var(--lime); border-color: #e1ffc2; }
+.world-event-tag { margin-bottom: 10px; padding: 5px 7px; color: var(--yellow); background: #2b230c; border: 1px solid #79651f; font: 850 6px/1 var(--font-geist-mono), monospace; letter-spacing: .8px; text-transform: uppercase; }
+.world-mechanic-banner { --power-color: var(--cyan); display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .45fr) minmax(0, 1fr); align-items: stretch; gap: 1px; padding: 1px; background: #294658; border-bottom: 2px solid var(--power-color); }
+.world-mechanic-banner.power-recall { --power-color: var(--yellow); }
+.world-mechanic-banner.power-override { --power-color: var(--violet); }
+.world-mechanic-banner > div { display: grid; align-content: center; gap: 5px; min-height: 92px; padding: 13px max(14px, 2vw); background: #08141f; }
+.world-mechanic-banner > div > small { color: var(--power-color); font: 850 7px/1 var(--font-geist-mono), monospace; letter-spacing: 1px; }
+.world-mechanic-banner > div > strong { font: 900 13px/1.15 var(--font-geist-mono), monospace; text-transform: uppercase; }
+.world-mechanic-banner > div > p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.world-mechanic-banner > div > em { color: #718a98; font: normal 750 7px/1 var(--font-geist-mono), monospace; text-transform: uppercase; }
+.world-mechanic-banner > div > button { justify-self: start; margin-top: 4px; padding: 8px 10px; color: #071317; background: var(--power-color); border: 1px solid #eaffff; box-shadow: 0 3px 0 #1b3f48; font: 900 8px/1 var(--font-geist-mono), monospace; text-transform: uppercase; }
+.world-mechanic-banner > div > button:disabled { color: #73808a; background: #25313a; border-color: #475762; box-shadow: none; cursor: not-allowed; }
+.world-mechanic-banner .world-charge { justify-items: center; text-align: center; background: #061017; }
+.world-charge > span { display: block; width: min(120px, 100%); height: 13px; padding: 3px; background: #010509; border: 1px solid #334d59; transform: skewX(-10deg); }
+.world-charge > span b { display: block; height: 100%; background: linear-gradient(90deg, var(--power-color), var(--lime)); box-shadow: 0 0 10px color-mix(in srgb, var(--power-color), transparent 45%); }
+.world-charge > small { color: #9ab1bb !important; }
+.world-power-result { display: grid; grid-template-columns: auto 1fr; gap: 11px; max-width: 900px; margin: 0 auto 16px; padding: 13px 15px; background: #10261f; border: 1px solid #5d8b4c; box-shadow: 4px 4px 0 #07130b; }
+.world-power-result > span { display: grid; place-items: center; width: 34px; height: 34px; color: #10200b; background: var(--lime); border: 2px solid #e1ffc2; }
+.world-power-result p { display: grid; gap: 4px; margin: 0; color: #b8c8bf; font-size: 11px; line-height: 1.45; }
+.world-power-result strong { color: var(--lime); font: 850 8px/1 var(--font-geist-mono), monospace; text-transform: uppercase; }
+.quiz-list label.eliminated { opacity: .42; filter: grayscale(1); text-decoration: line-through; border-style: dashed; }
+.quiz-list label.eliminated::after { margin-left: auto; color: var(--red); content: "DECOY REMOVED"; font: 850 6px/1 var(--font-geist-mono), monospace; letter-spacing: .6px; }
+@media (max-width: 1000px) {
+  .world-contract { grid-template-columns: 1fr; }
+  .world-mechanic-banner { grid-template-columns: 1fr 180px 1fr; }
+}
+@media (max-width: 680px) {
+  .world-contract { padding: 10px; }
+  .world-contract ol { grid-template-columns: 1fr; }
+  .world-contract li { min-height: 78px; }
+  .world-mechanic-banner { grid-template-columns: 1fr; }
+  .world-mechanic-banner .world-charge { min-height: 64px; }
+  .world-mechanic-banner > div > button { width: 100%; }
+  .world-event-tag { max-width: 126px; min-height: 26px; }
+  .quiz-list label.eliminated::after { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition-duration: .01ms !important; }
 }

@@ -94,6 +94,15 @@ type JourneyPreferences = {
   tutorialComplete: boolean;
 };
 
+type WorldPowerKind = "scan" | "recall" | "override";
+type WorldMechanic = {
+  event: string;
+  power: string;
+  kind: WorldPowerKind;
+  description: string;
+  effect: string;
+};
+
 const TRACKS: Track[] = [
   { id: "python", label: "Python", world: "Logic Highlands", worldTwo: "The Function Relay", kicker: "PYTHON TRAIL", description: "Learn programming foundations while Byte restores the living systems of the Code Realms.", outcome: "Commands · Loops · Functions · Collections", mission: "Repair the Logic Relay and reconnect every automation node.", energy: "Lumen shards", icon: "Py", nextWorld: "Object Odyssey" },
   { id: "genai", label: "GenAI", world: "Prompt Frontier", worldTwo: "The Agent Foundry", kicker: "AI EXPLORER TRAIL", description: "Learn how to prompt, guide, structure, and evaluate intelligent systems across a fractured signal frontier.", outcome: "Prompts · Grounding · Tools · Evaluation", mission: "Rebuild the Signal Archive and teach its agents to respond reliably.", energy: "Echo cores", icon: "AI", nextWorld: "Multimodal Metropolis" },
@@ -112,6 +121,38 @@ const PACE_MATCH: Record<PythonPaceId, string> = {
   intermediate: "Comfortable with the basics and ready to build",
   expert: "Preparing for production systems and architecture",
 };
+
+const WORLD_MECHANICS: Record<Track["id"], WorldMechanic[]> = {
+  python: [
+    { event: "Syntax Storm", power: "Signal Scanner", kind: "scan", description: "Corrupted syntax is hiding valid paths among noisy decoys.", effect: "Remove two incorrect checkpoint choices." },
+    { event: "Inventory Fog", power: "Memory Cache", kind: "recall", description: "The world periodically hides what each tool is meant to do.", effect: "Recall a lesson model and expose a dangerous mistake." },
+    { event: "Logic Lock", power: "Byte Override", kind: "override", description: "A logic gate must be patched before the relay can continue.", effect: "Byte repairs one unanswered checkpoint node." },
+    { event: "Debug Rift", power: "Trace Scanner", kind: "scan", description: "False traces split the program into unstable branches.", effect: "Remove two incorrect checkpoint choices." },
+    { event: "Algorithm Wilds", power: "Pattern Cache", kind: "recall", description: "Repeated structures are concealed by shifting terrain.", effect: "Recall the mental model behind the current topic." },
+    { event: "Runtime Breach", power: "Core Override", kind: "override", description: "The runtime is resisting the final system repair.", effect: "Byte repairs one unanswered checkpoint node." },
+  ],
+  genai: [
+    { event: "Prompt Static", power: "Intent Scanner", kind: "scan", description: "Ambiguous signals are producing convincing but incorrect paths.", effect: "Remove two incorrect checkpoint choices." },
+    { event: "Context Eclipse", power: "Context Cache", kind: "recall", description: "Vital context has fallen outside the active signal window.", effect: "Recover the topic mental model and safety warning." },
+    { event: "Agent Loop", power: "Loop Override", kind: "override", description: "An agent is repeating a broken decision cycle.", effect: "Byte repairs one unanswered checkpoint node." },
+    { event: "Grounding Drift", power: "Source Scanner", kind: "scan", description: "Unsupported claims are leaking into the archive.", effect: "Remove two incorrect checkpoint choices." },
+    { event: "Evaluation Fog", power: "Rubric Cache", kind: "recall", description: "The success criteria have been scattered across the frontier.", effect: "Recover the topic mental model and safety warning." },
+    { event: "Routing Failure", power: "Model Override", kind: "override", description: "The wrong system is answering the realm requests.", effect: "Byte repairs one unanswered checkpoint node." },
+  ],
+  sql: [
+    { event: "Query Static", power: "Planner Scanner", kind: "scan", description: "Decoy query paths are blocking the correct result set.", effect: "Remove two incorrect checkpoint choices." },
+    { event: "Schema Fog", power: "Schema Cache", kind: "recall", description: "Table relationships have faded from the data map.", effect: "Recover the topic mental model and common query trap." },
+    { event: "Lock Contention", power: "Transaction Override", kind: "override", description: "A blocked transaction is freezing the world relay.", effect: "Byte repairs one unanswered checkpoint node." },
+    { event: "Index Rift", power: "Index Scanner", kind: "scan", description: "The fastest path is buried among expensive plans.", effect: "Remove two incorrect checkpoint choices." },
+    { event: "Plan Eclipse", power: "Explain Cache", kind: "recall", description: "The optimizer reasoning is hidden from the expedition.", effect: "Recover the topic mental model and common query trap." },
+    { event: "Recovery Breach", power: "WAL Override", kind: "override", description: "The final data checkpoint needs a safe recovery patch.", effect: "Byte repairs one unanswered checkpoint node." },
+  ],
+};
+
+function getWorldMechanic(trackId: Track["id"], worldNumber: number): WorldMechanic {
+  const mechanics = WORLD_MECHANICS[trackId];
+  return mechanics[(Math.max(1, worldNumber) - 1) % mechanics.length];
+}
 
 function loadJourneyPreferences(): JourneyPreferences {
   try {
@@ -494,6 +535,8 @@ export default function Home() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [firstWorldCelebration, setFirstWorldCelebration] = useState(false);
+  const [worldPowerHint, setWorldPowerHint] = useState("");
+  const [eliminatedQuizOptions, setEliminatedQuizOptions] = useState<Record<number, number[]>>({});
   const clerkDisplayName = clerkProfile?.fullName
     ?? clerkProfile?.firstName
     ?? clerkProfile?.primaryEmailAddress?.emailAddress
@@ -617,6 +660,17 @@ export default function Home() {
     : activeTrack.id === "genai"
       ? getGenAIModule(activeGenAIPaceId, activeQuest.id)
       : getSQLModule(activeSQLPaceId, activeQuest.id);
+  const mapWorld = activeWorlds[currentWorldIndex] ?? activeWorlds[0];
+  const mapWorldMechanic = getWorldMechanic(activeTrack.id, mapWorld?.number ?? 1);
+  const mapWorldSideMissions = mapWorld ? trackBonus.filter((id) => id >= mapWorld.start && id < mapWorld.end).length : 0;
+  const mapWorldContractProgress = mapWorld
+    ? Math.round(((mapWorld.completed + Math.min(1, mapWorldSideMissions) + (mapWorld.projectComplete ? 1 : 0)) / (mapWorld.size + 2)) * 100)
+    : 0;
+  const activeWorldMechanic = getWorldMechanic(activeTrack.id, currentModule.number);
+  const worldPowerClaimKey = [todayKey, progressKey, "world-" + currentModule.number].join(":");
+  const worldPowerUsed = progress.game.worldPowerClaims.includes(worldPowerClaimKey);
+  const activeWorldSideMissions = trackBonus.filter((id) => id >= currentModule.start && id < currentModule.end).length;
+  const activeWorldCharge = Math.min(100, Math.round(((trackCompleted.filter((id) => id >= currentModule.start && id <= currentModule.end).length + (activeWorldSideMissions * 2) + (trackBonus.includes(currentModule.end) ? 3 : 0)) / (currentModule.size + 5)) * 100));
   const isRequiredWorldProject = activeQuest.id === currentModule.end;
   const activeGenAILab = activeTrack.id === "genai"
     ? buildGenAILab(activeGenAIPace.topics[activeQuest.id - 1], isRequiredWorldProject, currentModule.name)
@@ -835,7 +889,10 @@ export default function Home() {
     if (totalCompletedNext >= 1) inventory.add("Circuit Key");
     if (totalCompletedNext >= 5) inventory.add("Byte Beacon");
     if (totalCompletedNext >= 10) inventory.add("Archive Lens");
-    if (worldProject) inventory.add(`${activeTrack.label} Relay Core`);
+    if (worldProject) {
+      inventory.add(activeTrack.label + " Relay Core");
+      inventory.add(activeTrack.label + " · " + currentModule.name + " Relic");
+    }
     if (kind === "lab") inventory.add("Runtime Shard");
     if (dailyRewardEarned) {
       inventory.add("Daily Signal Cache");
@@ -1115,6 +1172,8 @@ export default function Home() {
     }
     setQuizAnswers({});
     setQuizResult("idle");
+    setWorldPowerHint("");
+    setEliminatedQuizOptions({});
     setView("quest");
   };
 
@@ -1211,6 +1270,42 @@ export default function Home() {
     if (activeTrack.id !== "genai") updateRuntimeReadiness(activeTrack.id, "idle");
     setStatus("idle");
     setTerminal("> Execution stopped by learner.\nEdit or reset the lab when you are ready.");
+  };
+
+  const activateWorldPower = () => {
+    if (lessonStage !== "quiz" || worldPowerUsed || quizResult === "passed") return;
+    const unresolvedIndex = activeQuiz.findIndex((question, index) => quizAnswers[index] !== question.answer);
+    if (unresolvedIndex < 0) {
+      setWorldPowerHint("Every checkpoint node is already aligned. Submit your answers to stabilize the relay.");
+      return;
+    }
+
+    const question = activeQuiz[unresolvedIndex];
+    if (activeWorldMechanic.kind === "scan") {
+      const decoys = question.options.map((_, index) => index).filter((index) => index !== question.answer).slice(0, Math.min(2, question.options.length - 1));
+      const nextAnswers = { ...quizAnswers };
+      if (decoys.includes(nextAnswers[unresolvedIndex])) delete nextAnswers[unresolvedIndex];
+      setQuizAnswers(nextAnswers);
+      setEliminatedQuizOptions((current) => ({ ...current, [unresolvedIndex]: decoys }));
+      setWorldPowerHint(activeWorldMechanic.power + " isolated question " + (unresolvedIndex + 1) + " and removed " + decoys.length + " corrupted paths.");
+    } else if (activeWorldMechanic.kind === "override") {
+      setQuizAnswers((current) => ({ ...current, [unresolvedIndex]: question.answer }));
+      setWorldPowerHint("Byte patched checkpoint node " + (unresolvedIndex + 1) + ". Inspect the repaired answer so you understand why it works.");
+    } else {
+      setWorldPowerHint(activeTheory.mentalModel + " Watch for this trap: " + activeTheory.commonMistake);
+    }
+
+    setQuizResult("idle");
+    persistProgress({
+      ...progress,
+      game: {
+        ...progress.game,
+        worldPowerClaims: [...new Set([...progress.game.worldPowerClaims, worldPowerClaimKey])].slice(-300),
+        updatedAt: progress.game.updatedAt + 1,
+      },
+    });
+    setGameToast(activeWorldMechanic.power.toUpperCase() + " DEPLOYED · RECHARGES TOMORROW");
+    playGameSound("select");
   };
 
   const submitQuiz = () => {
@@ -1372,7 +1467,7 @@ export default function Home() {
             <p>FIRST WORLD RESTORED</p>
             <h2 id="world-celebration-title">{currentModule.name} is back online!</h2>
             <span>You completed every checkpoint and defeated the world project. The next realm gate is now open.</span>
-            <div><article><small>PROJECT REWARD</small><strong>+75 XP</strong></article><article><small>ARTIFACT</small><strong>{activeTrack.label} Relay Core</strong></article></div>
+            <div><article><small>PROJECT REWARD</small><strong>+75 XP</strong></article><article><small>UNIQUE RELIC</small><strong>{currentModule.name} Relic</strong></article></div>
             <footer><button onClick={() => { setFirstWorldCelebration(false); setView("roadmap"); }}>View restored world</button><button className="onboarding-primary" onClick={() => { setFirstWorldCelebration(false); openNextSection(); }}>{activeModules[1] ? `Enter ${activeModules[1].name}` : "Finish path"}</button></footer>
           </section>
         </div>
@@ -1618,15 +1713,28 @@ export default function Home() {
               <button onClick={() => { playGameSound("select"); setStoryStep((current) => (current + 1) % byteStory.length); }}>Next transmission →</button>
             </div>
 
+            {mapWorld && (
+              <section className="world-contract" aria-label={mapWorld.name + " world contract"}>
+                <div className="world-contract-intro"><small>ACTIVE WORLD CONTRACT · {mapWorldContractProgress}%</small><h3>{mapWorld.name}: {mapWorldMechanic.event}</h3><p>{mapWorldMechanic.description}</p><div role="progressbar" aria-label="World contract progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={mapWorldContractProgress}><i style={{ width: mapWorldContractProgress + "%" }} /></div></div>
+                <ol>
+                  <li className={mapWorld.completed === mapWorld.size ? "done" : ""}><span>{mapWorld.completed === mapWorld.size ? "✓" : "1"}</span><p><strong>Repair knowledge nodes</strong>{mapWorld.completed}/{mapWorld.size} topic systems online</p></li>
+                  <li className={mapWorldSideMissions > 0 ? "done" : ""}><span>{mapWorldSideMissions > 0 ? "✓" : "2"}</span><p><strong>Recover a power cell</strong>{mapWorldSideMissions > 0 ? mapWorldSideMissions + " side mission completed" : "Complete one optional lab"}</p></li>
+                  <li className={mapWorld.projectComplete ? "done" : ""}><span>{mapWorld.projectComplete ? "✓" : "3"}</span><p><strong>Defeat the guardian</strong>{mapWorld.projectComplete ? "World relic recovered" : "Complete the required project"}</p></li>
+                </ol>
+              </section>
+            )}
+
             <div className="realm-map" style={{ "--world-count": activeWorlds.length } as CSSProperties}>
               <div className="realm-route" aria-hidden="true"><i style={{ width: `${activeWorlds.length > 1 ? (currentWorldIndex / (activeWorlds.length - 1)) * 100 : 100}%` }} /></div>
               {activeWorlds.map((world, index) => {
                 const percent = Math.round((world.completed / world.size) * 100);
                 const restored = world.completed === world.size && world.projectComplete;
                 const bossReady = world.completed === world.size && !world.projectComplete;
+                const mechanic = getWorldMechanic(activeTrack.id, world.number);
                 return (
                   <button className={`realm-world-node ${restored ? "restored" : bossReady ? "boss-ready" : world.unlocked ? "active" : "locked"} ${index === currentWorldIndex ? "player-here" : ""}`} key={world.name} onClick={() => enterWorld(world)} disabled={!world.unlocked}>
                     {index === currentWorldIndex && <span className={`map-player ${activeAvatar.id}`}>{activeAvatar.glyph}<small>YOU</small></span>}
+                    <span className="world-event-tag">{mechanic.event}</span>
                     <span className="realm-world-art" aria-hidden="true"><i /><i /><b>{restored ? "✓" : bossReady ? "!" : world.unlocked ? world.number : "▣"}</b></span>
                     <small>WORLD {String(world.number).padStart(2, "0")}</small>
                     <strong>{world.name}</strong>
@@ -1735,6 +1843,12 @@ export default function Home() {
             <div><i className={trackCompleted.includes(activeQuest.id) ? "active" : ""} /><i className={trackBonus.includes(activeQuest.id) ? "active" : ""} /></div>
           </div>
 
+          <section className={"world-mechanic-banner power-" + activeWorldMechanic.kind} aria-label="Active world mechanic">
+            <div><small>WORLD {String(currentModule.number).padStart(2, "0")} EVENT</small><strong>{activeWorldMechanic.event}</strong><p>{activeWorldMechanic.description}</p></div>
+            <div className="world-charge"><span><b style={{ width: activeWorldCharge + "%" }} /></span><small>RELAY CHARGE {activeWorldCharge}%</small></div>
+            <div><small>DAILY WORLD POWER</small><strong>{activeWorldMechanic.power}</strong><p>{activeWorldMechanic.effect}</p>{lessonStage === "quiz" ? <button onClick={activateWorldPower} disabled={worldPowerUsed || quizResult === "passed"}>{worldPowerUsed ? "Power recharging" : "Deploy power"}</button> : <em>Available at the checkpoint</em>}</div>
+          </section>
+
           {lessonStage === "theory" ? (
             <section className="learning-screen">
               <div className="learning-main">
@@ -1786,10 +1900,11 @@ export default function Home() {
           ) : lessonStage === "quiz" ? (
             <section className="quiz-screen">
               <div className="quiz-heading"><p className="pixel-kicker">STEP 3 · REQUIRED CHECKPOINT</p><h1>Prove what you learned</h1><span>{isRequiredWorldProject ? `Answer all ${activeQuiz.length} questions correctly, then complete the applied project to stabilize this world.` : `Answer all ${activeQuiz.length} questions correctly to unlock the next section. No coding is required.`}</span></div>
+              {worldPowerHint && <div className="world-power-result" role="status"><span>◆</span><p><strong>{activeWorldMechanic.power} report</strong>{worldPowerHint}</p></div>}
               <div className="quiz-list">
                 {activeQuiz.map((question, questionIndex) => (
                   <fieldset key={question.question}><legend><span>{questionIndex + 1}</span>{question.question}</legend>
-                    {question.options.map((option, optionIndex) => <label className={quizAnswers[questionIndex] === optionIndex ? "selected" : ""} key={option}><input type="radio" name={`question-${questionIndex}`} checked={quizAnswers[questionIndex] === optionIndex} onChange={() => { setQuizAnswers((current) => ({ ...current, [questionIndex]: optionIndex })); setQuizResult("idle"); }} /><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></label>)}
+                    {question.options.map((option, optionIndex) => <label className={(quizAnswers[questionIndex] === optionIndex ? "selected " : "") + ((eliminatedQuizOptions[questionIndex] ?? []).includes(optionIndex) ? "eliminated" : "")} key={option}><input disabled={(eliminatedQuizOptions[questionIndex] ?? []).includes(optionIndex)} type="radio" name={`question-${questionIndex}`} checked={quizAnswers[questionIndex] === optionIndex} onChange={() => { setQuizAnswers((current) => ({ ...current, [questionIndex]: optionIndex })); setQuizResult("idle"); }} /><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></label>)}
                     {quizResult !== "idle" && quizAnswers[questionIndex] !== undefined && <p className={quizAnswers[questionIndex] === question.answer ? "correct" : "incorrect"}>{quizAnswers[questionIndex] === question.answer ? `✓ Correct — ${question.explanation}` : `✕ ${question.explanation}`}</p>}
                   </fieldset>
                 ))}
