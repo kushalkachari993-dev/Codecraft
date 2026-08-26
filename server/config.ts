@@ -4,6 +4,8 @@ export interface CodeCraftEnvironment {
   CODECRAFT_GENAI_REQUESTS_PER_MINUTE?: string;
   CODECRAFT_ADMIN_USER_IDS?: string;
   CODECRAFT_ADMIN_EMAILS?: string;
+  CODECRAFT_TEMP_ADMIN_PASSCODE?: string;
+  CODECRAFT_TEMP_ADMIN_SESSION_SECRET?: string;
 }
 
 export interface ServerConfig {

@@ -63,3 +63,24 @@ test("owner analytics endpoint is server-side allowlisted", async () => {
   assert.match(page, /Learning funnel/);
   assert.match(page, /Recent feedback/);
 });
+
+test("temporary owner access uses a signed HTTP-only session and keeps Clerk authorization", async () => {
+  const [sessionRoute, session, analyticsRoute, page, docs] = await Promise.all([
+    read("app/api/admin/session/route.ts"),
+    read("server/temporary-admin-session.ts"),
+    read("app/api/admin/analytics/route.ts"),
+    read("app/admin/analytics/page.tsx"),
+    read("docs/TEMP_ADMIN_ACCESS.md"),
+  ]);
+  assert.match(sessionRoute, /MAX_FAILURES = 5/);
+  assert.match(sessionRoute, /isSameOriginRequest/);
+  assert.match(sessionRoute, /contentLength > 1_024/);
+  assert.match(session, /HttpOnly; SameSite=Strict/);
+  assert.match(session, /crypto\.subtle\.sign/);
+  assert.match(analyticsRoute, /isCodeCraftAdmin/);
+  assert.match(analyticsRoute, /verifyTemporaryAdminSession/);
+  assert.match(page, /Sign in with Clerk/);
+  assert.match(page, /Temporary beta owner passcode/);
+  assert.match(docs, /Mandatory removal checkpoint/);
+  assert.match(docs, /production Clerk/);
+});

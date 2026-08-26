@@ -59,3 +59,5 @@ See [docs/PORTABILITY.md](docs/PORTABILITY.md) for services, variables, migratio
 `.openai/hosting.json` declares the Sites project and D1 binding. Runtime configuration and secrets belong in the hosting environment, based on `.env.example`; real keys must never be committed.
 
 Set `CODECRAFT_ADMIN_USER_IDS` or `CODECRAFT_ADMIN_EMAILS` to a comma-separated Clerk allowlist before using `/admin/analytics`. The dashboard is protected server-side. Analytics uses predefined first-party events, keeps raw event rows for 90 days, and stores no code, prompts, answers, names, or emails in event records.
+
+During the closed beta only, the owner dashboard can also use the temporary passcode flow documented in [docs/TEMP_ADMIN_ACCESS.md](docs/TEMP_ADMIN_ACCESS.md). Clerk remains the permanent authentication path. The fallback and its secrets must be removed as soon as production Clerk is configured and verified.

@@ -2,10 +2,11 @@
 
 import { SignInButton, useAuth } from "@clerk/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import type { BetaAnalyticsSummary } from "../../../server/repositories/analytics-repository";
 
-type LoadState = "checking" | "loading" | "ready" | "denied" | "error";
+type LoadState = "checking" | "loading" | "ready" | "locked" | "denied" | "error";
+type AdminAnalyticsSummary = BetaAnalyticsSummary & { accessMode: "clerk" | "temporary" };
 
 const labels: Record<string, string> = {
   session_started: "Sessions",
@@ -27,21 +28,25 @@ const labels: Record<string, string> = {
 export default function AnalyticsAdminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [state, setState] = useState<LoadState>("checking");
-  const [summary, setSummary] = useState<BetaAnalyticsSummary | null>(null);
+  const [summary, setSummary] = useState<AdminAnalyticsSummary | null>(null);
   const [days, setDays] = useState(30);
   const [message, setMessage] = useState("");
+  const [passcode, setPasscode] = useState("");
 
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-    const controller = new AbortController();
-    void Promise.resolve().then(() => {
-      setState("loading");
-      return getToken();
-    }).then((token) => fetch(`/api/admin/analytics?days=${days}`, {
-      signal: controller.signal,
-      headers: token ? { authorization: `Bearer ${token}` } : {},
-    })).then(async (response) => {
-      const payload = await response.json() as BetaAnalyticsSummary & { error?: string };
+  const loadSummary = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const token = isSignedIn ? await getToken() : null;
+      const response = await fetch(`/api/admin/analytics?days=${days}`, {
+        signal,
+        credentials: "same-origin",
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      const payload = await response.json() as AdminAnalyticsSummary & { error?: string };
+      if (response.status === 401) {
+        setState("locked");
+        setMessage(payload.error ?? "Owner access required.");
+        return;
+      }
       if (response.status === 403) {
         setState("denied");
         setMessage(payload.error ?? "Owner access required.");
@@ -50,13 +55,45 @@ export default function AnalyticsAdminPage() {
       if (!response.ok) throw new Error(payload.error ?? "Analytics could not be loaded.");
       setSummary(payload);
       setState("ready");
-    }).catch((error: unknown) => {
+    } catch (error: unknown) {
       if ((error as { name?: string }).name === "AbortError") return;
       setState("error");
       setMessage(error instanceof Error ? error.message : "Analytics could not be loaded.");
-    });
+    }
+  }, [days, getToken, isSignedIn]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const controller = new AbortController();
+    void Promise.resolve().then(() => loadSummary(controller.signal));
     return () => controller.abort();
-  }, [days, getToken, isLoaded, isSignedIn]);
+  }, [isLoaded, loadSummary]);
+
+  async function unlock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setState("loading");
+    const response = await fetch("/api/admin/session", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ passcode }),
+    });
+    const payload = await response.json() as { error?: string };
+    setPasscode("");
+    if (!response.ok) {
+      setState("locked");
+      setMessage(payload.error ?? "Temporary owner access could not be unlocked.");
+      return;
+    }
+    await loadSummary();
+  }
+
+  async function lockTemporarySession() {
+    await fetch("/api/admin/session", { method: "DELETE", credentials: "same-origin" });
+    setSummary(null);
+    setState("locked");
+    setMessage("Temporary owner access was cleared.");
+  }
 
   const funnel = new Map(summary?.funnel.map((row) => [row.event_name, row]) ?? []);
   const sessions = Math.max(1, funnel.get("session_started")?.unique_sessions ?? summary?.totals.uniqueSessions ?? 1);
@@ -71,17 +108,40 @@ export default function AnalyticsAdminPage() {
         <span>Privacy-safe learning events and direct player feedback.</span>
       </header>
 
-      {!isLoaded ? (
-        <section><p>Checking owner access&</p></section>
-      ) : !isSignedIn ? (
-        <section><h2>Owner sign-in required</h2><p>Sign in with the Clerk account configured in CodeCraft&apos;s admin allowlist.</p><SignInButton mode="modal"><button className="legal-primary-button">Sign in</button></SignInButton></section>
+      {!isLoaded || state === "checking" ? (
+        <section><p>Checking owner access&hellip;</p></section>
+      ) : state === "locked" ? (
+        <section className="owner-access-panel">
+          <h2>Owner access required</h2>
+          <p>{message}</p>
+          <form className="owner-passcode-form" onSubmit={unlock}>
+            <label htmlFor="owner-passcode">Temporary beta owner passcode</label>
+            <div>
+              <input id="owner-passcode" type="password" autoComplete="current-password" value={passcode} onChange={(event) => setPasscode(event.target.value)} required minLength={16} />
+              <button className="legal-primary-button" type="submit">Unlock insights</button>
+            </div>
+          </form>
+          <p className="owner-access-divider">or use the permanent account path</p>
+          <SignInButton mode="modal"><button className="legal-primary-button">Sign in with Clerk</button></SignInButton>
+          <small>This passcode fallback is temporary and will be removed after production Clerk is verified.</small>
+        </section>
       ) : state === "denied" || state === "error" ? (
-        <section><h2>{state === "denied" ? "Owner access required" : "Dashboard unavailable"}</h2><p>{message}</p></section>
+        <section>
+          <h2>{state === "denied" ? "Owner access required" : "Dashboard unavailable"}</h2>
+          <p>{message}</p>
+          {state === "denied" && <p>Sign out of the non-owner Clerk account, or use a separate browser session for the temporary owner passcode.</p>}
+        </section>
       ) : state !== "ready" || !summary ? (
-        <section><p>Loading beta signals&</p></section>
+        <section><p>Loading beta signals&hellip;</p></section>
       ) : (
         <>
-          <section className="analytics-controls"><div><h2>Last {days} days</h2><p>Raw event rows are automatically removed after 90 days.</p></div><label><span>Window</span><select value={days} onChange={(event) => setDays(Number(event.target.value))}><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label></section>
+          <section className="analytics-controls">
+            <div><h2>Last {days} days</h2><p>Raw event rows are automatically removed after 90 days.</p></div>
+            <div className="analytics-control-actions">
+              <label><span>Window</span><select value={days} onChange={(event) => setDays(Number(event.target.value))}><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>
+              {summary.accessMode === "temporary" && <button className="legal-primary-button" onClick={lockTemporarySession}>Lock temporary access</button>}
+            </div>
+          </section>
           <section className="analytics-stat-grid">
             <article><small>ACTIVE SESSIONS</small><strong>{summary.totals.uniqueSessions}</strong><span>{summary.totals.signedInLearners} signed-in learners</span></article>
             <article><small>LEARNING EVENTS</small><strong>{summary.totals.events}</strong><span>predefined events only</span></article>
