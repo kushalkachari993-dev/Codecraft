@@ -14,6 +14,10 @@ export type GameProfile = {
   dailyTopics: number;
   dailyLabs: number;
   dailyClaimed: boolean;
+  dailyQuestDate: string;
+  dailyQuestId: string;
+  dailyQuestCompleted: boolean;
+  dailyQuestStreak: number;
   inventory: string[];
   worldPowerClaims: string[];
   updatedAt: number;
@@ -36,6 +40,10 @@ export const DEFAULT_GAME_PROFILE: GameProfile = {
   dailyTopics: 0,
   dailyLabs: 0,
   dailyClaimed: false,
+  dailyQuestDate: "",
+  dailyQuestId: "",
+  dailyQuestCompleted: false,
+  dailyQuestStreak: 0,
   inventory: ["Signal Compass"],
   worldPowerClaims: [],
   updatedAt: 0,
@@ -71,6 +79,10 @@ function cleanGame(value: unknown): GameProfile {
     dailyTopics: Number.isInteger(source.dailyTopics) ? Math.max(0, Math.min(100, Number(source.dailyTopics))) : 0,
     dailyLabs: Number.isInteger(source.dailyLabs) ? Math.max(0, Math.min(100, Number(source.dailyLabs))) : 0,
     dailyClaimed: source.dailyClaimed === true,
+    dailyQuestDate: typeof source.dailyQuestDate === "string" ? source.dailyQuestDate.slice(0, 10) : "",
+    dailyQuestId: typeof source.dailyQuestId === "string" ? source.dailyQuestId.slice(0, 120) : "",
+    dailyQuestCompleted: source.dailyQuestCompleted === true,
+    dailyQuestStreak: Number.isInteger(source.dailyQuestStreak) ? Math.max(0, Math.min(10_000, Number(source.dailyQuestStreak))) : 0,
     inventory: Array.isArray(source.inventory)
       ? [...new Set(source.inventory.filter((item): item is string => typeof item === "string" && item.length > 0 && item.length <= 80))].slice(0, 100)
       : [...DEFAULT_GAME_PROFILE.inventory],
@@ -102,6 +114,7 @@ export function mergeProgress(local: PlayerProgress, cloud: PlayerProgress): Pla
   const cloudGame = cleanGame(cloud.game);
   const newestGame = localGame.updatedAt >= cloudGame.updatedAt ? localGame : cloudGame;
   const sameDailyDate = localGame.dailyDate && localGame.dailyDate === cloudGame.dailyDate;
+  const sameDailyQuestDate = localGame.dailyQuestDate && localGame.dailyQuestDate === cloudGame.dailyQuestDate;
   return {
     xp: Math.max(local.xp, cloud.xp),
     completed: mergeBucket(local.completed, cloud.completed),
@@ -113,6 +126,14 @@ export function mergeProgress(local: PlayerProgress, cloud: PlayerProgress): Pla
       dailyTopics: sameDailyDate ? Math.max(localGame.dailyTopics, cloudGame.dailyTopics) : newestGame.dailyTopics,
       dailyLabs: sameDailyDate ? Math.max(localGame.dailyLabs, cloudGame.dailyLabs) : newestGame.dailyLabs,
       dailyClaimed: sameDailyDate ? localGame.dailyClaimed || cloudGame.dailyClaimed : newestGame.dailyClaimed,
+      dailyQuestDate: sameDailyQuestDate ? localGame.dailyQuestDate : newestGame.dailyQuestDate,
+      dailyQuestId: sameDailyQuestDate
+        ? localGame.dailyQuestCompleted ? localGame.dailyQuestId : cloudGame.dailyQuestId
+        : newestGame.dailyQuestId,
+      dailyQuestCompleted: sameDailyQuestDate
+        ? localGame.dailyQuestCompleted || cloudGame.dailyQuestCompleted
+        : newestGame.dailyQuestCompleted,
+      dailyQuestStreak: Math.max(localGame.dailyQuestStreak, cloudGame.dailyQuestStreak),
       inventory: [...new Set([...localGame.inventory, ...cloudGame.inventory])],
       worldPowerClaims: [...new Set([...localGame.worldPowerClaims, ...cloudGame.worldPowerClaims])].slice(-300),
     },

@@ -28,6 +28,7 @@ import type { ExecutionResult, RuntimeProgress, RuntimeWorkerTrack } from "./exe
 import { DEFAULT_PROGRESS, mergeProgress, normalizeProgress, type AvatarId, type PlayerProgress } from "./progress";
 import BetaFeedback from "./beta-feedback";
 import { trackAnalyticsEvent, type AnalyticsContext, type AnalyticsEventName } from "./analytics-events";
+import { DAILY_QUEST_XP, getDailyQuestIndex, getDailyQuestStreak } from "./daily-quest";
 
 type RunState = "idle" | "running" | "ready" | "error" | "complete";
 type RuntimeReadiness = "idle" | "preparing" | "ready" | "error";
@@ -541,6 +542,7 @@ export default function Home() {
   const [worldFeedbackPrompt, setWorldFeedbackPrompt] = useState(false);
   const [worldPowerHint, setWorldPowerHint] = useState("");
   const [eliminatedQuizOptions, setEliminatedQuizOptions] = useState<Record<number, number[]>>({});
+  const [dailyQuestSession, setDailyQuestSession] = useState<{ date: string; key: string; questId: number } | null>(null);
   const clerkDisplayName = clerkProfile?.fullName
     ?? clerkProfile?.firstName
     ?? clerkProfile?.primaryEmailAddress?.emailAddress
@@ -638,14 +640,16 @@ export default function Home() {
       ? [`${pendingRequiredProject.title} is understood. Now we need to prove it under pressure.`, `The guardian simulation is active in ${activeWorlds[currentWorldIndex]?.name ?? "this world"}. This is your boss mission.`, "Pass every runtime check and the next world gate will open."]
       : [`Signal detected in ${activeWorlds[currentWorldIndex]?.name ?? "this world"}. The next unstable system is ${nextQuest?.title ?? activeQuest.title}.`, "Each topic repairs part of the landscape. Watch the world node energize after your checkpoint.", "Theory gives us the map. Your choices and code bring the realm back online."];
   const todayKey = new Date().toISOString().slice(0, 10);
-  const dailyTopics = progress.game.dailyDate === todayKey ? progress.game.dailyTopics : 0;
-  const dailyLabs = progress.game.dailyDate === todayKey ? progress.game.dailyLabs : 0;
+  const dailyQuestMode = dailyQuestSession?.date === todayKey;
+  const dailyQuestCompletedToday = progress.game.dailyQuestDate === todayKey && progress.game.dailyQuestCompleted;
+  const dailyQuestPreview = activeQuests[getDailyQuestIndex(todayKey, activeTrack.id, activePaceId, activeQuests.length)] ?? activeQuests[0];
   const achievements = [
     { id: "first-signal", icon: "◇", name: "First Signal", detail: "Complete your first topic", unlocked: totalBadges >= 1 },
     { id: "badge-hunter", icon: "✦", name: "Badge Hunter", detail: "Recover 10 topic badges", unlocked: totalBadges >= 10 },
     { id: "world-restorer", icon: "◆", name: "World Restorer", detail: "Defeat a world boss", unlocked: totalProjects >= 1 },
     { id: "three-realms", icon: "△", name: "Three Realms", detail: "Study Python, GenAI, and SQL", unlocked: trackProfileStats.every((track) => track.completed > 0) },
-    { id: "streak-runner", icon: "↟", name: "Streak Runner", detail: "Reach a 3-day streak", unlocked: progress.game.streakDays >= 3 },
+    { id: "streak-runner", icon: "↟", name: "Streak Runner", detail: "Reach a 3-day learning streak", unlocked: progress.game.streakDays >= 3 },
+    { id: "daily-runner", icon: "☼", name: "Daily Runner", detail: "Complete Daily Quests on 3 consecutive days", unlocked: progress.game.dailyQuestStreak >= 3 },
     { id: "path-master", icon: "◈", name: "Path Master", detail: "Complete an entire learning path", unlocked: Object.entries(progress.completed).some(([key, ids]) => {
       const [trackId, paceId] = key.split("-");
       const paces = trackId === "python" ? PYTHON_PACES : trackId === "genai" ? GENAI_PACES : trackId === "sql" ? SQL_PACES : [];
@@ -675,7 +679,7 @@ export default function Home() {
   const worldPowerUsed = progress.game.worldPowerClaims.includes(worldPowerClaimKey);
   const activeWorldSideMissions = trackBonus.filter((id) => id >= currentModule.start && id < currentModule.end).length;
   const activeWorldCharge = Math.min(100, Math.round(((trackCompleted.filter((id) => id >= currentModule.start && id <= currentModule.end).length + (activeWorldSideMissions * 2) + (trackBonus.includes(currentModule.end) ? 3 : 0)) / (currentModule.size + 5)) * 100));
-  const isRequiredWorldProject = activeQuest.id === currentModule.end;
+  const isRequiredWorldProject = !dailyQuestMode && activeQuest.id === currentModule.end;
   const activeGenAILab = activeTrack.id === "genai"
     ? buildGenAILab(activeGenAIPace.topics[activeQuest.id - 1], isRequiredWorldProject, currentModule.name)
     : null;
@@ -684,7 +688,7 @@ export default function Home() {
     : activeTrack.id === "sql"
       ? buildSQLChallenge(activeSQLPace.topics[activeQuest.id - 1], { required: isRequiredWorldProject, worldName: currentModule.name })
       : null;
-  const bonusXp = isRequiredWorldProject ? 75 : 20;
+  const bonusXp = dailyQuestMode ? DAILY_QUEST_XP : isRequiredWorldProject ? 75 : 20;
   const sidebarQuests = focusedModule
     ? activeQuests.filter((quest) => quest.id >= focusedModule.start && quest.id <= focusedModule.end)
     : activeQuests;
@@ -903,7 +907,6 @@ export default function Home() {
       ? baseProgress.game.lastActiveDate === yesterday ? Math.max(1, baseProgress.game.streakDays + 1) : 1
       : baseProgress.game.streakDays;
     const dailyClaimedPreviously = sameDay && baseProgress.game.dailyClaimed;
-    const dailyRewardEarned = dailyTopicsNext >= 1 && !dailyClaimedPreviously;
     const totalCompletedNext = Object.values(baseProgress.completed).reduce((sum, ids) => sum + ids.length, 0);
     const inventory = new Set(baseProgress.game.inventory);
     inventory.add("Signal Compass");
@@ -915,13 +918,9 @@ export default function Home() {
       inventory.add(activeTrack.label + " · " + currentModule.name + " Relic");
     }
     if (kind === "lab") inventory.add("Runtime Shard");
-    if (dailyRewardEarned) {
-      inventory.add("Daily Signal Cache");
-      setGameToast("DAILY MISSION COMPLETE · +25 XP · Signal Cache recovered");
-    }
     return {
       ...baseProgress,
-      xp: baseProgress.xp + (dailyRewardEarned ? 25 : 0),
+      xp: baseProgress.xp,
       game: {
         ...baseProgress.game,
         streakDays,
@@ -929,7 +928,7 @@ export default function Home() {
         dailyDate: today,
         dailyTopics: dailyTopicsNext,
         dailyLabs: dailyLabsNext,
-        dailyClaimed: dailyClaimedPreviously || dailyRewardEarned,
+        dailyClaimed: dailyClaimedPreviously,
         inventory: [...inventory],
         updatedAt: baseProgress.game.updatedAt + 1,
       },
@@ -1174,6 +1173,7 @@ export default function Home() {
 
   const openQuest = (quest: Quest, startAtProject = false) => {
     if (!isUnlocked(quest)) return;
+    setDailyQuestSession(null);
     const destinationModule = activeTrack.id === "python"
       ? getPythonModule(activePythonPaceId, quest.id)
       : activeTrack.id === "genai"
@@ -1289,7 +1289,7 @@ export default function Home() {
       return;
     }
 
-    const alreadySubmitted = trackBonus.includes(activeQuest.id);
+    const alreadySubmitted = dailyQuestMode ? dailyQuestCompletedToday : trackBonus.includes(activeQuest.id);
     setSceneStep(activeQuest.steps);
     setStatus(alreadySubmitted ? "complete" : "ready");
     const runtimeName = result.runtime === "python-wasm"
@@ -1378,30 +1378,99 @@ export default function Home() {
     emitAnalytics("checkpoint_passed");
   };
 
+  const openDailyQuest = () => {
+    const quest = dailyQuestPreview;
+    const questModule = activeTrack.id === "python"
+      ? getPythonModule(activePythonPaceId, quest.id)
+      : activeTrack.id === "genai"
+        ? getGenAIModule(activeGenAIPaceId, quest.id)
+        : getSQLModule(activeSQLPaceId, quest.id);
+    const dailyLab = activeTrack.id === "genai"
+      ? buildGenAILab(activeGenAIPace.topics[quest.id - 1], false, questModule.name)
+      : null;
+    const dailyChallenge = activeTrack.id === "python"
+      ? buildPythonChallenge(activePythonPace.topics[quest.id - 1], { required: false, worldName: questModule.name })
+      : activeTrack.id === "sql"
+        ? buildSQLChallenge(activeSQLPace.topics[quest.id - 1], { required: false, worldName: questModule.name })
+        : null;
+    const key = [todayKey, activeTrack.id, activePaceId, quest.id].join(":");
+    clearRun();
+    setExecutionResult(null);
+    setDailyQuestSession({ date: todayKey, key, questId: quest.id });
+    setActiveQuestId(quest.id);
+    setCode(dailyLab?.starterCode ?? dailyChallenge?.starterCode ?? quest.starterCode);
+    setStatus(dailyQuestCompletedToday ? "complete" : "idle");
+    setTerminal(dailyQuestCompletedToday
+      ? "> Daily Quest already complete\n✓ Return tomorrow for a new challenge."
+      : "Today's challenge is ready. Pass every check, then claim the Daily Quest reward.");
+    setSceneStep(dailyQuestCompletedToday ? quest.steps : 0);
+    setLessonStage("bonus");
+    setQuizAnswers({});
+    setQuizResult("idle");
+    setView("quest");
+    warmExecutionRuntime(activeTrack.id);
+    void trackAnalyticsEvent("daily_quest_started", {
+      track: activeTrack.id,
+      pace: activePaceId,
+      topicId: quest.id,
+      worldNumber: questModule.number,
+    }, clerkSignedIn ? getToken : undefined);
+    playGameSound("select");
+  };
+
   const openBonus = () => {
+    const bonusAlreadyComplete = dailyQuestMode ? dailyQuestCompletedToday : trackBonus.includes(activeQuest.id);
     clearRun();
     setExecutionResult(null);
     setCode(activeGenAILab?.starterCode ?? activeChallenge?.starterCode ?? `# Optional challenge\n# Rebuild the solution without using the helper snippets.\n`);
-    setStatus(trackBonus.includes(activeQuest.id) ? "complete" : "idle");
-    setTerminal(trackBonus.includes(activeQuest.id)
-      ? "> Lab already complete\n✓ Your XP and progress are saved."
-      : activeGenAILab
-        ? activeGenAILab.required
-          ? "Required world project ready. Pass every rubric check to stabilize this world."
-          : "Controlled AI practice lab ready. No personal API key or credits are needed."
-        : activeTrack.id === "sql"
-          ? isRequiredWorldProject ? "Required database project ready. Build the report view and pass every database-state check." : "Practice database ready. Run real PostgreSQL against a fresh dataset."
-          : isRequiredWorldProject ? "Required Python project ready. Build the relay report and pass every hidden test." : "Python sandbox ready. Run real Python directly in your browser.");
-    setSceneStep(trackBonus.includes(activeQuest.id) ? activeQuest.steps : 0);
+    setStatus(bonusAlreadyComplete ? "complete" : "idle");
+    setTerminal(bonusAlreadyComplete
+      ? dailyQuestMode ? "> Daily Quest already complete\n✓ Return tomorrow for a new challenge." : "> Lab already complete\n✓ Your XP and progress are saved."
+      : dailyQuestMode
+        ? "Today's challenge is ready. Pass every check, then claim the Daily Quest reward."
+        : activeGenAILab
+          ? activeGenAILab.required
+            ? "Required world project ready. Pass every rubric check to stabilize this world."
+            : "Controlled AI practice lab ready. No personal API key or credits are needed."
+          : activeTrack.id === "sql"
+            ? isRequiredWorldProject ? "Required database project ready. Build the report view and pass every database-state check." : "Practice database ready. Run real PostgreSQL against a fresh dataset."
+            : isRequiredWorldProject ? "Required Python project ready. Build the relay report and pass every hidden test." : "Python sandbox ready. Run real Python directly in your browser.");
+    setSceneStep(bonusAlreadyComplete ? activeQuest.steps : 0);
     setLessonStage("bonus");
     warmExecutionRuntime(activeTrack.id);
-    emitAnalytics("lab_started");
+    emitAnalytics(dailyQuestMode ? "daily_quest_started" : "lab_started");
   };
 
   const submitBonus = () => {
     if (status !== "ready" && status !== "complete") {
       setStatus("error");
       setTerminal("> Run required\n! Execute the current solution successfully before submitting it.");
+      return;
+    }
+    if (dailyQuestMode && dailyQuestSession) {
+      if (!dailyQuestCompletedToday) {
+        const activityProgress = recordGameActivity({ ...progress, xp: progress.xp + DAILY_QUEST_XP }, "lab");
+        const inventory = [...new Set([...activityProgress.game.inventory, "Daily Quest Cache"])];
+        persistProgress({
+          ...activityProgress,
+          game: {
+            ...activityProgress.game,
+            dailyQuestDate: todayKey,
+            dailyQuestId: dailyQuestSession.key,
+            dailyQuestCompleted: true,
+            dailyQuestStreak: getDailyQuestStreak(progress.game.dailyQuestDate, progress.game.dailyQuestStreak, todayKey),
+            inventory,
+            updatedAt: activityProgress.game.updatedAt + 1,
+          },
+        });
+        emitAnalytics("daily_quest_completed");
+        setGameToast("DAILY QUEST COMPLETE · +" + DAILY_QUEST_XP + " XP · STREAK EXTENDED");
+        playGameSound("complete");
+      }
+      if (executionResult) saveSubmission(executionResult, "submitted");
+      setStatus("complete");
+      setSceneStep(activeQuest.steps);
+      setTerminal("> Daily Quest complete!\n+ " + DAILY_QUEST_XP + " XP earned. A new challenge arrives at 00:00 UTC.");
       return;
     }
     const firstWorldRestoredNow = isRequiredWorldProject && currentModule.number === 1 && !trackBonus.includes(activeQuest.id);
@@ -1426,6 +1495,11 @@ export default function Home() {
   };
 
   const openNextSection = () => {
+    if (dailyQuestMode) {
+      setDailyQuestSession(null);
+      setView("roadmap");
+      return;
+    }
     if (activeQuest.id < activeQuests.length) openQuest(activeQuests[activeQuest.id]);
     else setView("roadmap");
   };
@@ -1433,15 +1507,16 @@ export default function Home() {
   return (
     <main className={`app-shell track-${activeTrack.id}`}>
       <header className="topbar">
-        <button className="brand" onClick={() => setView("tracks")} aria-label="Open CodeCraft tracks">
+        <button className="brand" onClick={() => { setDailyQuestSession(null); setView("tracks"); }} aria-label="Open CodeCraft tracks">
           <span className="brand-cube" aria-hidden="true"><i /></span>
           <span>CODECRAFT</span>
         </button>
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={view === "tracks" ? "active" : ""} onClick={() => setView("tracks")}>Tracks</button>
-          {isPacedTrack && <button className={view === "paces" ? "active" : ""} onClick={() => setView("paces")}>Pace</button>}
-          <button className={view === "roadmap" ? "active" : ""} onClick={() => setView(isPacedTrack && !hasChosenActivePace ? "paces" : "roadmap")}>Roadmap</button>
-          <button className={view === "quest" ? "active" : ""} onClick={() => openQuest(activeQuest)}>Quest</button>
+          <button className={view === "tracks" ? "active" : ""} onClick={() => { setDailyQuestSession(null); setView("tracks"); }}>Tracks</button>
+          {isPacedTrack && <button className={view === "paces" ? "active" : ""} onClick={() => { setDailyQuestSession(null); setView("paces"); }}>Pace</button>}
+          <button className={view === "roadmap" ? "active" : ""} onClick={() => { setDailyQuestSession(null); setView(isPacedTrack && !hasChosenActivePace ? "paces" : "roadmap"); }}>Roadmap</button>
+          <button className={view === "quest" && !dailyQuestMode ? "active" : ""} onClick={() => openQuest(activeQuest)}>Quest</button>
+          <button className={dailyQuestMode ? "active daily-nav" : "daily-nav"} onClick={openDailyQuest}>Daily Quest</button>
         </nav>
         <div className="player-stats">
           <button className="stat-chip profile-stat-trigger" onClick={openProfile} aria-label={`Open profile, ${progress.xp} XP`}><b>◆</b> {progress.xp} XP</button>
@@ -1648,6 +1723,12 @@ export default function Home() {
               <button onClick={resumeJourney}>Continue where I left off</button>
             </section>
           )}
+          <section className={`daily-quest-launch ${dailyQuestCompletedToday ? "complete" : ""}`} aria-labelledby="daily-quest-title">
+            <div className="daily-quest-emblem" aria-hidden="true">☼<span>{String(new Date().getUTCDate()).padStart(2, "0")}</span></div>
+            <div><p>DAILY QUEST · RESETS 00:00 UTC</p><h2 id="daily-quest-title">{dailyQuestPreview.title}</h2><span>{activeTrack.label} · {activePace.label} · 5–15 minute challenge</span></div>
+            <div className="daily-quest-reward"><small>TODAY&apos;S REWARD</small><strong>+{DAILY_QUEST_XP} XP</strong><span>{progress.game.dailyQuestStreak} day streak</span></div>
+            <button onClick={openDailyQuest}>{dailyQuestCompletedToday ? "Replay today's quest" : "Open daily quest"} →</button>
+          </section>
           {totalBadges === 0 && <FirstRunChecklist activeStep={0} />}
           <section className="track-recommender" aria-labelledby="track-recommender-title">
             <div><p>NEED A RECOMMENDATION?</p><h2 id="track-recommender-title">What do you want to build?</h2></div>
@@ -1859,12 +1940,13 @@ export default function Home() {
                 </div>
                 <p className="panel-note">{focusedModule ? `Showing ${focusedModule.name}. Complete every topic to collect all ${activeQuests.length} signal badges.` : "Complete each chapter to recover its signal badge."}</p>
               </div>
-              <div className="daily-card">
-                <p>DAILY MISSION · {progress.game.streakDays} DAY STREAK</p>
-                <strong>Restore one system</strong>
-                <div><i className={dailyTopics >= 1 ? "done" : ""} /></div>
-                <span>{dailyTopics >= 1 ? "Complete · +25 XP cache recovered" : `${dailyTopics} / 1 topics today`}</span>
-                <small>Side objective: complete a lab · {dailyLabs}/1</small>
+              <div className={`daily-card ${dailyQuestCompletedToday ? "complete" : ""}`}>
+                <p>DAILY QUEST · {progress.game.dailyQuestStreak} DAY STREAK</p>
+                <strong>{dailyQuestPreview.title}</strong>
+                <div><i className={dailyQuestCompletedToday ? "done" : ""} /></div>
+                <span>{dailyQuestCompletedToday ? `Complete · +${DAILY_QUEST_XP} XP claimed` : `${activeTrack.label} · ${activePace.label} · +${DAILY_QUEST_XP} XP`}</span>
+                <small>New deterministic challenge every day at 00:00 UTC.</small>
+                <button onClick={openDailyQuest}>{dailyQuestCompletedToday ? "Replay challenge" : "Start daily quest"} →</button>
               </div>
               <div className="world-legend">
                 <p>RELAY SKILLS</p>
@@ -1876,32 +1958,42 @@ export default function Home() {
       ) : (
         <section className="lesson-page">
           <div className="lesson-bar">
-            <button onClick={() => setView("roadmap")}>← Roadmap</button>
-            <div><span>{activeTrack.label.toUpperCase()} / {isPacedTrack ? `${activePace.label.toUpperCase()} / ` : ""}{activeQuest.chapter.toUpperCase()}</span><strong>{activeQuest.title}</strong></div>
-            <div className="lesson-progress"><i style={{ width: `${((activeQuest.id - 1) / activeQuests.length) * 100}%` }} /></div>
-            <span>{activeQuest.id} / {activeQuests.length}</span>
+            <button onClick={() => { if (dailyQuestMode) setDailyQuestSession(null); setView("roadmap"); }}>{dailyQuestMode ? "← Close daily quest" : "← Roadmap"}</button>
+            <div><span>{dailyQuestMode ? `DAILY QUEST / ${activeTrack.label.toUpperCase()} / ${activePace.label.toUpperCase()}` : `${activeTrack.label.toUpperCase()} / ${isPacedTrack ? `${activePace.label.toUpperCase()} / ` : ""}${activeQuest.chapter.toUpperCase()}`}</span><strong>{activeQuest.title}</strong></div>
+            <div className="lesson-progress"><i style={{ width: dailyQuestMode ? dailyQuestCompletedToday ? "100%" : "50%" : `${((activeQuest.id - 1) / activeQuests.length) * 100}%` }} /></div>
+            <span>{dailyQuestMode ? "UTC" : `${activeQuest.id} / ${activeQuests.length}`}</span>
           </div>
 
-          {totalBadges === 0 && activeQuest.id === 1 && <div className="lesson-first-run"><FirstRunChecklist activeStep={3} /></div>}
+          {!dailyQuestMode && totalBadges === 0 && activeQuest.id === 1 && <div className="lesson-first-run"><FirstRunChecklist activeStep={3} /></div>}
 
-          <div className="curriculum-steps" aria-label="Lesson stages">
-            {stageOrder.map((stage, index) => {
-              const done = index < stageIndex || isStageComplete(stage);
-              return <span className={index === stageIndex ? "active" : done ? "done" : ""} key={stage}><i>{done ? "✓" : index + 1}</i>{stage === "quiz" ? "Checkpoint" : stage === "bonus" ? isRequiredWorldProject ? "World project" : activeGenAILab ? "AI lab" : "Optional code" : stage[0].toUpperCase() + stage.slice(1)}</span>;
-            })}
-          </div>
+          {dailyQuestMode ? (
+            <section className={`daily-quest-brief ${dailyQuestCompletedToday ? "complete" : ""}`}>
+              <div className="daily-quest-emblem" aria-hidden="true">☼<span>DQ</span></div>
+              <div><p>TODAY&apos;S RELAY CHALLENGE</p><h1>{activeQuest.title}</h1><span>Pass every visible and hidden check. The first successful submission today awards XP and extends your streak.</span><div><b>{activeTrack.label}</b><b>{activePace.label}</b><b>5–15 min</b></div></div>
+              <aside><small>REWARD</small><strong>+{DAILY_QUEST_XP} XP</strong><span>{progress.game.dailyQuestStreak} day streak</span><i>{dailyQuestCompletedToday ? "REWARD CLAIMED" : "AVAILABLE TODAY"}</i></aside>
+            </section>
+          ) : (
+            <>
+              <div className="curriculum-steps" aria-label="Lesson stages">
+                {stageOrder.map((stage, index) => {
+                  const done = index < stageIndex || isStageComplete(stage);
+                  return <span className={index === stageIndex ? "active" : done ? "done" : ""} key={stage}><i>{done ? "✓" : index + 1}</i>{stage === "quiz" ? "Checkpoint" : stage === "bonus" ? isRequiredWorldProject ? "World project" : activeGenAILab ? "AI lab" : "Optional code" : stage[0].toUpperCase() + stage.slice(1)}</span>;
+                })}
+              </div>
 
-          <div className={`quest-story-strip ${isRequiredWorldProject ? "boss-mission" : ""}`}>
-            <span>◆<small>BYTE</small></span>
-            <p><strong>{isRequiredWorldProject ? `BOSS MISSION · ${currentModule.name}` : `SYSTEM REPAIR · ${activeQuest.title}`}</strong>{isRequiredWorldProject ? "The world guardian is testing everything you learned here. Clear the checkpoint, then stabilize the live system to open the gate." : `This lesson controls one part of ${currentModule.name}. Complete the checkpoint and watch its realm signal turn on.`}</p>
-            <div><i className={trackCompleted.includes(activeQuest.id) ? "active" : ""} /><i className={trackBonus.includes(activeQuest.id) ? "active" : ""} /></div>
-          </div>
+              <div className={`quest-story-strip ${isRequiredWorldProject ? "boss-mission" : ""}`}>
+                <span>◆<small>BYTE</small></span>
+                <p><strong>{isRequiredWorldProject ? `BOSS MISSION · ${currentModule.name}` : `SYSTEM REPAIR · ${activeQuest.title}`}</strong>{isRequiredWorldProject ? "The world guardian is testing everything you learned here. Clear the checkpoint, then stabilize the live system to open the gate." : `This lesson controls one part of ${currentModule.name}. Complete the checkpoint and watch its realm signal turn on.`}</p>
+                <div><i className={trackCompleted.includes(activeQuest.id) ? "active" : ""} /><i className={trackBonus.includes(activeQuest.id) ? "active" : ""} /></div>
+              </div>
 
-          <section className={"world-mechanic-banner power-" + activeWorldMechanic.kind} aria-label="Active world mechanic">
-            <div><small>WORLD {String(currentModule.number).padStart(2, "0")} EVENT</small><strong>{activeWorldMechanic.event}</strong><p>{activeWorldMechanic.description}</p></div>
-            <div className="world-charge"><span><b style={{ width: activeWorldCharge + "%" }} /></span><small>RELAY CHARGE {activeWorldCharge}%</small></div>
-            <div><small>DAILY WORLD POWER</small><strong>{activeWorldMechanic.power}</strong><p>{activeWorldMechanic.effect}</p>{lessonStage === "quiz" ? <button onClick={activateWorldPower} disabled={worldPowerUsed || quizResult === "passed"}>{worldPowerUsed ? "Power recharging" : "Deploy power"}</button> : <em>Available at the checkpoint</em>}</div>
-          </section>
+              <section className={"world-mechanic-banner power-" + activeWorldMechanic.kind} aria-label="Active world mechanic">
+                <div><small>WORLD {String(currentModule.number).padStart(2, "0")} EVENT</small><strong>{activeWorldMechanic.event}</strong><p>{activeWorldMechanic.description}</p></div>
+                <div className="world-charge"><span><b style={{ width: activeWorldCharge + "%" }} /></span><small>RELAY CHARGE {activeWorldCharge}%</small></div>
+                <div><small>DAILY WORLD POWER</small><strong>{activeWorldMechanic.power}</strong><p>{activeWorldMechanic.effect}</p>{lessonStage === "quiz" ? <button onClick={activateWorldPower} disabled={worldPowerUsed || quizResult === "passed"}>{worldPowerUsed ? "Power recharging" : "Deploy power"}</button> : <em>Available at the checkpoint</em>}</div>
+              </section>
+            </>
+          )}
 
           {lessonStage === "theory" ? (
             <section className="learning-screen">
@@ -1971,10 +2063,10 @@ export default function Home() {
           <div className="lesson-workspace">
             <section className="lesson-content">
               <div className="lesson-copy">
-                <p className="pixel-kicker">{isRequiredWorldProject ? "WORLD BOSS · REQUIRED PROJECT" : "OPTIONAL SIDE MISSION"} · +{bonusXp} XP</p>
+                <p className="pixel-kicker">{dailyQuestMode ? "DAILY QUEST · ONE REWARD PER DAY" : isRequiredWorldProject ? "WORLD BOSS · REQUIRED PROJECT" : "OPTIONAL SIDE MISSION"} · +{bonusXp} XP</p>
                 <h1>{activeGenAILab?.title ?? activeChallenge?.title ?? "Optional coding challenge"}</h1>
                 <p>{activeGenAILab?.brief ?? activeChallenge?.instructions ?? `Rebuild the ${activeQuest.concept} solution from a blank editor. This practice does not block your progress to the next section.`}</p>
-                <div className="objective-card"><span>◆</span><div><small>YOUR OBJECTIVE</small><strong>{activeQuest.objective}</strong></div></div>
+                <div className="objective-card"><span>◆</span><div><small>{dailyQuestMode ? "TODAY'S OBJECTIVE" : "YOUR OBJECTIVE"}</small><strong>{activeQuest.objective}</strong></div></div>
                 <div className="guide-card"><span>?</span><p><strong>Field guide</strong>{activeQuest.guide}</p></div>
                 {activeGenAILab && (
                   <div className={`genai-lab-kit ${activeGenAILab.required ? "required-project" : ""}`}>
@@ -2038,7 +2130,7 @@ export default function Home() {
               <div className="editor-actions">
                 <span>Ctrl + Enter to run</span>
                 {status === "running" ? <button className="stop-execution" onClick={stopExecution}>■ Stop execution</button> : <button className="run-secondary" onClick={runCode}>▶ {activeGenAILab ? "Evaluate lab" : activeTrack.id === "sql" ? "Run SQL" : "Run Python"}</button>}
-                <button className="submit-primary" onClick={submitBonus} disabled={status !== "ready" && status !== "complete"}>Submit {isRequiredWorldProject ? "boss project" : activeGenAILab ? "practice lab" : "optional challenge"}</button>
+                <button className="submit-primary" onClick={submitBonus} disabled={status !== "ready" && status !== "complete"}>{dailyQuestMode ? dailyQuestCompletedToday ? "Daily reward claimed" : "Claim daily reward" : `Submit ${isRequiredWorldProject ? "boss project" : activeGenAILab ? "practice lab" : "optional challenge"}`}</button>
               </div>
               <div className={`terminal ${status}`}>
                 <div><span>{activeGenAILab ? "CONTROLLED AI EVALUATOR" : activeTrack.id === "sql" ? "POSTGRESQL OUTPUT" : "PYTHON OUTPUT"}</span><i>{status === "running" ? "RUNNING" : status.toUpperCase()}</i></div>
@@ -2054,8 +2146,8 @@ export default function Home() {
               </div>
               {status === "complete" && (
                 <div className="quest-complete-banner">
-                  <div><span>✦</span><p><small>{isRequiredWorldProject ? "WORLD BOSS DEFEATED" : "SIDE MISSION COMPLETE"}</small><strong>+{bonusXp} {isRequiredWorldProject ? "project" : "bonus"} XP</strong></p></div>
-                  <button onClick={openNextSection}>{isRequiredWorldProject ? isFinalQuest ? "Finish path" : "Enter next world" : "Next section"} →</button>
+                  <div><span>✦</span><p><small>{dailyQuestMode ? "DAILY QUEST COMPLETE" : isRequiredWorldProject ? "WORLD BOSS DEFEATED" : "SIDE MISSION COMPLETE"}</small><strong>+{bonusXp} {dailyQuestMode ? "daily" : isRequiredWorldProject ? "project" : "bonus"} XP</strong></p></div>
+                  <button onClick={openNextSection}>{dailyQuestMode ? "Return to roadmap" : isRequiredWorldProject ? isFinalQuest ? "Finish path" : "Enter next world" : "Next section"} →</button>
                 </div>
               )}
             </section>

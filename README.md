@@ -1,6 +1,6 @@
 # CodeCraft
 
-CodeCraft is a game-inspired learning platform with Python, SQL, and GenAI tracks. Lessons, examples, assessments, browser-based code labs, saved progress, profiles, and optional hosted AI coaching are delivered through a vinext/React application.
+CodeCraft is a game-inspired learning platform with Python, SQL, and GenAI tracks. Lessons, examples, assessments, rotating Daily Quests, browser-based code labs, saved progress, profiles, and optional hosted AI coaching are delivered through a vinext/React application.
 
 ## Prerequisites
 

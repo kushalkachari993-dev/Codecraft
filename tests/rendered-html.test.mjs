@@ -203,7 +203,8 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(page, /recordGameActivity/);
   assert.match(page, /Avatar loadout/);
   assert.match(page, /Inventory & achievements/);
-  assert.match(page, /DAILY MISSION COMPLETE/);
+  assert.match(page, /DAILY QUEST COMPLETE/);
+  assert.match(progressSource, /dailyQuestStreak/);
   assert.match(progressSource, /export type GameProfile/);
   assert.match(progressSource, /streakDays/);
   assert.match(progressSource, /inventory: \[\.\.\.new Set/);

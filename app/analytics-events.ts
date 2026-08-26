@@ -13,6 +13,8 @@ export const ANALYTICS_EVENT_NAMES = [
   "lab_completed",
   "world_power_used",
   "world_completed",
+  "daily_quest_started",
+  "daily_quest_completed",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];

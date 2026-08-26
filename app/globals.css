@@ -288,6 +288,47 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px
 .panel-note, .daily-card > span { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .daily-card strong { display: block; margin-bottom: 13px; font-size: 14px; }.daily-card > div { height: 8px; padding: 2px; margin-bottom: 9px; background: #050914; border: 1px solid var(--line); }.daily-card i { display: block; width: 0; height: 100%; background: var(--yellow); }.daily-card i.done { width: 100%; }
 .daily-card > small { display: block; margin-top: 9px; color: var(--cyan); font: 700 8px/1.4 var(--font-geist-mono), monospace; }
+
+.main-nav .daily-nav { color: var(--yellow); }
+.main-nav .daily-nav.active, .main-nav .daily-nav:hover { color: #fff3af; border-bottom-color: var(--yellow); }
+.daily-quest-launch { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 20px; width: min(1180px, 100%); margin: 20px auto 26px; padding: 20px 22px; overflow: hidden; background-color: #18130a; background-image: linear-gradient(90deg, #ffd95c12 1px, transparent 1px), linear-gradient(#ffd95c12 1px, transparent 1px), radial-gradient(circle at 82% 25%, #ffd95c30, transparent 28%); background-size: 20px 20px, 20px 20px, auto; border: 2px solid #d7aa35; box-shadow: 7px 7px 0 #050301, 0 0 30px #ffd95c12; }
+.daily-quest-launch.complete { border-color: #76b94a; background-color: #0c1a0c; }
+.daily-quest-emblem { position: relative; display: grid; place-items: center; width: 72px; height: 72px; color: #2b1c02; background: var(--yellow); border: 3px solid #fff0a5; box-shadow: 0 0 22px #ffd95c70, 5px 5px 0 #5e3d08; font: 900 29px/1 var(--font-geist-mono), monospace; clip-path: polygon(18% 0, 82% 0, 100% 18%, 100% 82%, 82% 100%, 18% 100%, 0 82%, 0 18%); }
+.daily-quest-emblem span { position: absolute; right: 7px; bottom: 6px; font-size: 8px; }
+.daily-quest-launch > div:nth-child(2) p, .daily-quest-brief > div:nth-child(2) p { margin: 0 0 7px; color: var(--yellow); font: 850 8px/1 var(--font-geist-mono), monospace; letter-spacing: 1px; }
+.daily-quest-launch h2 { margin: 0 0 7px; color: white; font: 900 clamp(18px, 2.4vw, 27px)/1 var(--font-geist-mono), monospace; }
+.daily-quest-launch > div:nth-child(2) > span { color: #cbbf9a; font-size: 11px; }
+.daily-quest-reward { min-width: 116px; padding-left: 18px; border-left: 1px solid #7b632a; }
+.daily-quest-reward small, .daily-quest-reward span { display: block; color: #ab9662; font: 750 7px/1.35 var(--font-geist-mono), monospace; }
+.daily-quest-reward strong { display: block; margin: 5px 0; color: var(--yellow); font: 900 18px/1 var(--font-geist-mono), monospace; }
+.daily-quest-launch > button, .daily-card > button { min-height: 42px; padding: 12px 16px; color: #201602; background: var(--yellow); border: 2px solid #fff0a5; box-shadow: 0 4px 0 #7a5109; font: 850 9px/1 var(--font-geist-mono), monospace; text-transform: uppercase; }
+.daily-quest-launch.complete > button, .daily-card.complete > button { color: #10200b; background: var(--lime); border-color: #dbffae; box-shadow: 0 4px 0 #3f712b; }
+.daily-card > button { width: 100%; margin-top: 12px; }
+.daily-card.complete { border-color: #5a8d43; }
+.daily-quest-brief { display: grid; grid-template-columns: auto minmax(0, 1fr) 180px; align-items: center; gap: 22px; padding: 22px clamp(20px, 4vw, 42px); background-color: #171108; background-image: linear-gradient(90deg, #ffd95c13 1px, transparent 1px), linear-gradient(#ffd95c13 1px, transparent 1px), radial-gradient(circle at 80% 20%, #ffd95c2c, transparent 28%); background-size: 24px 24px, 24px 24px, auto; border-bottom: 2px solid #b98d28; }
+.daily-quest-brief.complete { background-color: #09170d; border-color: #5a8d43; }
+.daily-quest-brief h1 { margin: 0 0 8px; color: white; font: 900 clamp(20px, 3vw, 34px)/1.05 var(--font-geist-mono), monospace; }
+.daily-quest-brief > div:nth-child(2) > span { color: #c7bfa8; font-size: 12px; line-height: 1.5; }
+.daily-quest-brief > div:nth-child(2) > div { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.daily-quest-brief > div:nth-child(2) b { padding: 6px 8px; color: var(--yellow); background: #3c2d0d; border: 1px solid #7b632a; font: 800 8px/1 var(--font-geist-mono), monospace; text-transform: uppercase; }
+.daily-quest-brief aside { display: grid; gap: 6px; padding: 15px; background: #080703b8; border: 1px solid #7b632a; }
+.daily-quest-brief aside small, .daily-quest-brief aside span { color: #a99666; font: 750 8px/1.3 var(--font-geist-mono), monospace; }
+.daily-quest-brief aside strong { color: var(--yellow); font: 900 24px/1 var(--font-geist-mono), monospace; }
+.daily-quest-brief aside i { padding-top: 7px; color: var(--lime); border-top: 1px solid #4b421f; font: 800 7px/1 var(--font-geist-mono), monospace; font-style: normal; }
+
+@media (max-width: 1000px) {
+  .daily-quest-launch { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .daily-quest-launch > button { grid-column: 2 / -1; }
+}
+@media (max-width: 680px) {
+  .daily-quest-launch { grid-template-columns: auto minmax(0, 1fr); gap: 14px; padding: 16px; }
+  .daily-quest-emblem { width: 56px; height: 56px; font-size: 23px; }
+  .daily-quest-reward { grid-column: 1 / -1; padding: 12px 0 0; border-top: 1px solid #7b632a; border-left: 0; }
+  .daily-quest-launch > button { grid-column: 1 / -1; width: 100%; }
+  .daily-quest-brief { grid-template-columns: auto minmax(0, 1fr); gap: 14px; }
+  .daily-quest-brief aside { grid-column: 1 / -1; }
+}
+
 .world-legend { display: grid; gap: 10px; }.world-legend > p { margin-bottom: 3px; }.world-legend span { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; }.world-legend i { width: 10px; height: 10px; background: #1c2738; border: 1px solid #48566d; }.world-legend i.done { background: var(--lime); border-color: #d1ff9d; }
 
 .lesson-page { min-height: calc(100vh - 72px); display: flex; flex-direction: column; }
