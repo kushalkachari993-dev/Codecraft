@@ -15,8 +15,7 @@ test("enriches all thirteen Round 2 beginner topics", async () => {
 });
 
 test("ships Round 2 authored execution missions and world projects", async () => {
-  const [page, challenges, labs, challengeRouter, genaiRouter, types, sqlRunner] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  const [challenges, labs, challengeRouter, genaiRouter, types, sqlRunner] = await Promise.all([
     readFile(new URL("../app/round2-challenges.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/round2-genai-labs.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/challenges.ts", import.meta.url), "utf8"),
@@ -25,7 +24,7 @@ test("ships Round 2 authored execution missions and world projects", async () =>
     readFile(new URL("../app/execution/sql-runner.worker.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /getRoundTwoLessonEnrichment/);
+  assert.match(await readFile(new URL("../app/lesson-enrichment-bundle.ts", import.meta.url), "utf8"), /getRoundTwoLessonEnrichment/);
   assert.match(challengeRouter, /buildRoundTwoPythonChallenge/);
   assert.match(challengeRouter, /buildRoundTwoSQLChallenge/);
   assert.match(genaiRouter, /buildRoundTwoGenAILab/);

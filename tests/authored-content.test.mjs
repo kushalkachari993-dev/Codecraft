@@ -31,7 +31,7 @@ test("uses authored first-world execution missions and precise checks", async ()
     readFile(new URL("../app/genai-curriculum.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /getLessonEnrichment/);
+  assert.match(await readFile(new URL("../app/lesson-enrichment-bundle.ts", import.meta.url), "utf8"), /getLessonEnrichment/);
   assert.match(page, /WHY THIS MATTERS/);
   assert.match(page, /Correct —/);
   assert.match(page, /rotateQuizOptions/);

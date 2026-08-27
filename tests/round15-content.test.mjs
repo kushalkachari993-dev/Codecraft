@@ -17,14 +17,13 @@ test("enriches all fifteen Round 15 expert topics", async () => {
 });
 
 test("ships Round 15 authored execution missions and world projects", async () => {
-  const [page, challenges, labs, challengeRouter, genaiRouter] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  const [challenges, labs, challengeRouter, genaiRouter] = await Promise.all([
     readFile(new URL("../app/round15-challenges.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/round15-genai-labs.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/challenges.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/genai-curriculum.ts", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /getRoundFifteenLessonEnrichment/);
+  assert.match(await readFile(new URL("../app/lesson-enrichment-bundle.ts", import.meta.url), "utf8"), /getRoundFifteenLessonEnrichment/);
   assert.match(challengeRouter, /buildRoundFifteenPythonChallenge/);
   assert.match(challengeRouter, /buildRoundFifteenSQLChallenge/);
   assert.match(genaiRouter, /buildRoundFifteenGenAILab/);

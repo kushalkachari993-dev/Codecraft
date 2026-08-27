@@ -1,29 +1,10 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { SignInButton, useAuth, useClerk, useUser } from "@clerk/react";
 import { PYTHON_PACES, type PythonPaceId } from "./python-curriculum";
 import { GENAI_PACES, buildGenAILab, validateGenAILab, type GenAIPaceId } from "./genai-curriculum";
 import { SQL_PACES, type SQLPaceId } from "./sql-curriculum";
-import { executeLab } from "./execution/client";
-import { buildPythonChallenge, buildSQLChallenge } from "./challenges";
-import { getLessonEnrichment } from "./authored-lessons";
-import { getRoundTwoLessonEnrichment } from "./authored-lessons-round2";
-import { getRoundThreeLessonEnrichment } from "./authored-lessons-round3";
-import { getRoundFourLessonEnrichment } from "./authored-lessons-round4";
-import { getRoundFiveLessonEnrichment } from "./authored-lessons-round5";
-import { getRoundSixLessonEnrichment } from "./authored-lessons-round6";
-import { getRoundSevenLessonEnrichment } from "./authored-lessons-round7";
-import { getRoundEightLessonEnrichment } from "./authored-lessons-round8";
-import { getRoundNineLessonEnrichment } from "./authored-lessons-round9";
-import { getRoundTenLessonEnrichment } from "./authored-lessons-round10";
-import { getRoundElevenLessonEnrichment } from "./authored-lessons-round11";
-import { getRoundTwelveLessonEnrichment } from "./authored-lessons-round12";
-import { getRoundThirteenLessonEnrichment } from "./authored-lessons-round13";
-import { getRoundFourteenLessonEnrichment } from "./authored-lessons-round14";
-import { getRoundFifteenLessonEnrichment } from "./authored-lessons-round15";
-import { getRoundSixteenLessonEnrichment } from "./authored-lessons-round16";
-import { getRoundSeventeenLessonEnrichment } from "./authored-lessons-round17";
 import type { ExecutionResult } from "./execution/types";
 import { type AvatarId, type PlayerProgress } from "./progress";
 import BetaFeedback from "./beta-feedback";
@@ -34,9 +15,8 @@ import { useProgressSync } from "./hooks/use-progress-sync";
 import { useProfile } from "./hooks/use-profile";
 import { useLabRuntime } from "./hooks/use-lab-runtime";
 import { useDailyQuest } from "./hooks/use-daily-quest";
-import ProfilePanel from "./components/profile-panel";
-import WorldMap from "./components/world-map";
-import { ExampleLessonView, LabWorkspaceView, QuizLessonView, TheoryLessonView } from "./components/lesson-stage-views";
+import { useLessonEnrichment } from "./hooks/use-lesson-enrichment";
+import { loadLabChallenge, useLabChallenge } from "./hooks/use-lab-challenge";
 import { PacePickerView, TrackPickerView } from "./components/journey-views";
 import {
   AVATARS,
@@ -62,6 +42,13 @@ import {
 
 type View = "tracks" | "paces" | "roadmap" | "quest";
 type LessonStage = "theory" | "example" | "quiz" | "bonus";
+
+const ProfilePanel = lazy(() => import("./components/profile-panel"));
+const WorldMap = lazy(() => import("./components/world-map"));
+const TheoryLessonView = lazy(() => import("./components/lesson-stage-views").then((module) => ({ default: module.TheoryLessonView })));
+const ExampleLessonView = lazy(() => import("./components/lesson-stage-views").then((module) => ({ default: module.ExampleLessonView })));
+const QuizLessonView = lazy(() => import("./components/lesson-stage-views").then((module) => ({ default: module.QuizLessonView })));
+const LabWorkspaceView = lazy(() => import("./components/lesson-stage-views").then((module) => ({ default: module.LabWorkspaceView })));
 
 export default function Home() {
   const { getToken, isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useAuth();
@@ -163,24 +150,6 @@ export default function Home() {
     : activeTrack.id === "genai"
       ? buildGenAITheory(activeGenAIPace.topics[activeQuest.id - 1])
       : buildSQLTheory(activeSQLPace.topics[activeQuest.id - 1]);
-  const activeLessonEnrichment = getLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundTwoLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundThreeLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundFourLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundFiveLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundSixLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundSevenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundEightLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundNineLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundTenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundElevenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundTwelveLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundThirteenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundFourteenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundFifteenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundSixteenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title)
-    ?? getRoundSeventeenLessonEnrichment(activeTrack.id, activePaceId, activeQuest.title);
-  const activeQuiz = buildQuiz(activeQuest, activeLessonEnrichment?.quiz ?? null);
   const completedCount = trackCompleted.length;
   const progressPercent = Math.round((completedCount / activeQuests.length) * 100);
   const level = Math.max(1, Math.floor((progress.xp - 120) / 100) + 1);
@@ -237,6 +206,13 @@ export default function Home() {
     completedToday: dailyQuestCompletedToday,
     preview: dailyQuestPreview,
   } = useDailyQuest({ progress, quests: activeQuests, trackId: activeTrack.id, paceId: activePaceId });
+  const { enrichment: activeLessonEnrichment, loading: lessonContentLoading } = useLessonEnrichment({
+    enabled: view === "roadmap" || (view === "quest" && !dailyQuestMode),
+    trackId: activeTrack.id,
+    paceId: activePaceId,
+    title: activeQuest.title,
+  });
+  const activeQuiz = buildQuiz(activeQuest, activeLessonEnrichment?.quiz ?? null);
   const achievements = [
     { id: "first-signal", icon: "◇", name: "First Signal", detail: "Complete your first topic", unlocked: totalBadges >= 1 },
     { id: "badge-hunter", icon: "✦", name: "Badge Hunter", detail: "Recover 10 topic badges", unlocked: totalBadges >= 10 },
@@ -277,11 +253,18 @@ export default function Home() {
   const activeGenAILab = activeTrack.id === "genai"
     ? buildGenAILab(activeGenAIPace.topics[activeQuest.id - 1], isRequiredWorldProject, currentModule.name)
     : null;
-  const activeChallenge = activeTrack.id === "python"
-    ? buildPythonChallenge(activePythonPace.topics[activeQuest.id - 1], { required: isRequiredWorldProject, worldName: currentModule.name })
+  const activeChallengeTrack = activeTrack.id === "python" || activeTrack.id === "sql" ? activeTrack.id : null;
+  const activeChallengeTopic = activeTrack.id === "python"
+    ? activePythonPace.topics[activeQuest.id - 1]
     : activeTrack.id === "sql"
-      ? buildSQLChallenge(activeSQLPace.topics[activeQuest.id - 1], { required: isRequiredWorldProject, worldName: currentModule.name })
+      ? activeSQLPace.topics[activeQuest.id - 1]
       : null;
+  const activeChallenge = useLabChallenge({
+    enabled: view === "roadmap" || view === "quest",
+    track: activeChallengeTrack,
+    topic: activeChallengeTopic,
+    options: { required: isRequiredWorldProject, worldName: currentModule.name },
+  });
   const bonusXp = dailyQuestMode ? DAILY_QUEST_XP : isRequiredWorldProject ? 75 : 20;
   const sidebarQuests = focusedModule
     ? activeQuests.filter((quest) => quest.id >= focusedModule.start && quest.id <= focusedModule.end)
@@ -548,7 +531,7 @@ export default function Home() {
     return previousId !== previousModule.end || trackBonus.includes(previousId);
   };
 
-  const openQuest = (quest: Quest, startAtProject = false) => {
+  const openQuest = async (quest: Quest, startAtProject = false) => {
     if (!isUnlocked(quest)) return;
     clearDailyQuestSession();
     const destinationModule = activeTrack.id === "python"
@@ -562,9 +545,9 @@ export default function Home() {
       const projectModule = destinationModule;
       const projectLab = activeTrack.id === "genai" ? buildGenAILab(activeGenAIPace.topics[quest.id - 1], true, projectModule.name) : null;
       const projectChallenge = activeTrack.id === "python"
-        ? buildPythonChallenge(activePythonPace.topics[quest.id - 1], { required: true, worldName: projectModule.name })
+        ? await loadLabChallenge("python", activePythonPace.topics[quest.id - 1], { required: true, worldName: projectModule.name })
         : activeTrack.id === "sql"
-          ? buildSQLChallenge(activeSQLPace.topics[quest.id - 1], { required: true, worldName: projectModule.name })
+          ? await loadLabChallenge("sql", activeSQLPace.topics[quest.id - 1], { required: true, worldName: projectModule.name })
           : null;
       const projectComplete = trackBonus.includes(quest.id);
       setCode(projectLab?.starterCode ?? projectChallenge?.starterCode ?? quest.starterCode);
@@ -626,6 +609,7 @@ export default function Home() {
     let result: ExecutionResult;
     try {
       const authToken = activeGenAILab && clerkSignedIn ? await getToken() ?? undefined : undefined;
+      const { executeLab } = await import("./execution/client");
       result = await executeLab({
         track: activeTrack.id,
         code,
@@ -742,7 +726,7 @@ export default function Home() {
     emitAnalytics("checkpoint_passed");
   };
 
-  const openDailyQuest = () => {
+  const openDailyQuest = async () => {
     const quest = dailyQuestPreview;
     const questModule = activeTrack.id === "python"
       ? getPythonModule(activePythonPaceId, quest.id)
@@ -753,9 +737,9 @@ export default function Home() {
       ? buildGenAILab(activeGenAIPace.topics[quest.id - 1], false, questModule.name)
       : null;
     const dailyChallenge = activeTrack.id === "python"
-      ? buildPythonChallenge(activePythonPace.topics[quest.id - 1], { required: false, worldName: questModule.name })
+      ? await loadLabChallenge("python", activePythonPace.topics[quest.id - 1], { required: false, worldName: questModule.name })
       : activeTrack.id === "sql"
-        ? buildSQLChallenge(activeSQLPace.topics[quest.id - 1], { required: false, worldName: questModule.name })
+        ? await loadLabChallenge("sql", activeSQLPace.topics[quest.id - 1], { required: false, worldName: questModule.name })
         : null;
     const key = [todayKey, activeTrack.id, activePaceId, quest.id].join(":");
     clearRun();
@@ -782,11 +766,14 @@ export default function Home() {
     playGameSound("select");
   };
 
-  const openBonus = () => {
+  const openBonus = async () => {
     const bonusAlreadyComplete = dailyQuestMode ? dailyQuestCompletedToday : trackBonus.includes(activeQuest.id);
+    const bonusChallenge = activeChallenge ?? (activeChallengeTrack && activeChallengeTopic
+      ? await loadLabChallenge(activeChallengeTrack, activeChallengeTopic, { required: isRequiredWorldProject, worldName: currentModule.name })
+      : null);
     clearRun();
     setExecutionResult(null);
-    setCode(activeGenAILab?.starterCode ?? activeChallenge?.starterCode ?? `# Optional challenge\n# Rebuild the solution without using the helper snippets.\n`);
+    setCode(activeGenAILab?.starterCode ?? bonusChallenge?.starterCode ?? `# Optional challenge\n# Rebuild the solution without using the helper snippets.\n`);
     setStatus(bonusAlreadyComplete ? "complete" : "idle");
     setTerminal(bonusAlreadyComplete
       ? dailyQuestMode ? "> Daily Quest already complete\n✓ Return tomorrow for a new challenge." : "> Lab already complete\n✓ Your XP and progress are saved."
@@ -966,7 +953,7 @@ export default function Home() {
         </div>
       )}
 
-      <ProfilePanel
+      {profileOpen && <Suspense fallback={null}><ProfilePanel
         open={profileOpen}
         signedIn={Boolean(clerkSignedIn)}
         email={clerkEmail}
@@ -998,7 +985,7 @@ export default function Home() {
         onChooseAvatar={chooseAvatar}
         onManageAccount={() => { closeProfile(); clerk.openUserProfile(); }}
         onSignOut={() => { closeProfile(); void clerk.signOut({ redirectUrl: "/" }); }}
-      />
+      /></Suspense>}
 
       {view === "tracks" ? (
         <TrackPickerView
@@ -1048,7 +1035,7 @@ export default function Home() {
           </section>
           {totalBadges === 0 && <div className="roadmap-first-run"><FirstRunChecklist activeStep={2} /><p><strong>Your map is ready.</strong> Learn the game loop, then begin the first highlighted topic.</p></div>}
 
-          <WorldMap
+          <Suspense fallback={<div className="view-loading" role="status">Loading world map…</div>}><WorldMap
             paceLabel={activePace.label}
             streakDays={progress.game.streakDays}
             inventoryCount={progress.game.inventory.length}
@@ -1067,7 +1054,7 @@ export default function Home() {
             getWorldEvent={(worldNumber) => getWorldMechanic(activeTrack.id, worldNumber).event}
             onNextTransmission={() => { playGameSound("select"); setStoryStep((current) => (current + 1) % byteStory.length); }}
             onEnterWorld={enterWorld}
-          />
+          /></Suspense>
 
           <div className="roadmap-layout">
             <section className="trail-panel">
@@ -1182,7 +1169,10 @@ export default function Home() {
             </>
           )}
 
-          {lessonStage === "theory" ? (
+          <Suspense fallback={<section className="view-loading lesson-view-loading" role="status">Loading lesson workspace…</section>}>
+          {lessonContentLoading && lessonStage !== "bonus" ? (
+            <section className="view-loading lesson-view-loading" role="status">Loading authored lesson…</section>
+          ) : lessonStage === "theory" ? (
             <TheoryLessonView
               quest={activeQuest}
               theory={activeTheory}
@@ -1242,6 +1232,7 @@ export default function Home() {
               onNext={openNextSection}
             />
           )}
+          </Suspense>
         </section>
       )}
     </main>

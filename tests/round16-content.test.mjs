@@ -16,12 +16,11 @@ test("enriches all nine Round 16 expert topics", async () => {
 });
 
 test("ships Round 16 authored execution missions and world projects", async () => {
-  const [page, challenges, challengeRouter] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  const [challenges, challengeRouter] = await Promise.all([
     readFile(new URL("../app/round16-challenges.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/challenges.ts", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /getRoundSixteenLessonEnrichment/);
+  assert.match(await readFile(new URL("../app/lesson-enrichment-bundle.ts", import.meta.url), "utf8"), /getRoundSixteenLessonEnrichment/);
   assert.match(challengeRouter, /buildRoundSixteenPythonChallenge/);
   assert.match(challengeRouter, /buildRoundSixteenSQLChallenge/);
   const pythonRouter = challengeRouter.slice(challengeRouter.indexOf("export function buildPythonChallenge"));

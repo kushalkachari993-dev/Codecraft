@@ -33,3 +33,35 @@ test("Worker delegates hosted AI and persistence to adapters", async () => {
   assert.match(worker, /WorkersAiEvaluator/);
   assert.match(worker, /D1ProgressRepository/);
 });
+
+
+test("CI verifies lint, tests, and the production build", async () => {
+  const [workflow, packageJson] = await Promise.all([
+    readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ]);
+  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /push:/);
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run lint/);
+  assert.match(workflow, /npm run test:unit/);
+  assert.match(workflow, /npm run build/);
+  assert.match(packageJson, /"test:unit"/);
+});
+
+test("heavy lesson content and browser runtimes load on demand", async () => {
+  const [page, enrichmentHook, challengeHook, runtimeHook, executionClient] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/hooks/use-lesson-enrichment.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/hooks/use-lab-challenge.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/hooks/use-lab-runtime.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/execution/client.ts", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(page, /from "\.\/authored-lessons-round/);
+  assert.match(enrichmentHook, /import\("\.\.\/lesson-enrichment-bundle"\)/);
+  assert.match(challengeHook, /import\("\.\.\/challenges"\)/);
+  assert.match(page, /await import\("\.\/execution\/client"\)/);
+  assert.match(runtimeHook, /import\("\.\.\/execution\/client"\)/);
+  assert.match(executionClient, /new Worker\("\/python-runner\.js"/);
+  assert.match(executionClient, /new URL\("\.\/sql-runner\.worker\.ts"/);
+});
