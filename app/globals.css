@@ -733,3 +733,17 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px
   .legal-page > section.analytics-stat-grid { grid-template-columns: repeat(2, 1fr); }
   .analytics-feedback-list article header { align-items: start; flex-direction: column; gap: 7px; }
 }
+
+
+.view-loading {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  color: var(--muted);
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.lesson-view-loading { min-height: 420px; }

@@ -19,15 +19,14 @@ test("enriches all fifteen Round 3 beginner topics", async () => {
 });
 
 test("ships Round 3 authored execution missions and world projects", async () => {
-  const [page, challenges, labs, challengeRouter, genaiRouter] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  const [challenges, labs, challengeRouter, genaiRouter] = await Promise.all([
     readFile(new URL("../app/round3-challenges.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/round3-genai-labs.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/challenges.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/genai-curriculum.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /getRoundThreeLessonEnrichment/);
+  assert.match(await readFile(new URL("../app/lesson-enrichment-bundle.ts", import.meta.url), "utf8"), /getRoundThreeLessonEnrichment/);
   assert.match(challengeRouter, /buildRoundThreePythonChallenge/);
   assert.match(challengeRouter, /buildRoundThreeSQLChallenge/);
   assert.match(genaiRouter, /buildRoundThreeGenAILab/);

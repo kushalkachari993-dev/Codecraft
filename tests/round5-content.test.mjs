@@ -20,15 +20,14 @@ test("enriches all twelve Round 5 topics across the pace transition", async () =
 });
 
 test("ships Round 5 authored execution missions and world projects", async () => {
-  const [page, challenges, labs, challengeRouter, genaiRouter] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  const [challenges, labs, challengeRouter, genaiRouter] = await Promise.all([
     readFile(new URL("../app/round5-challenges.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/round5-genai-labs.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/challenges.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/genai-curriculum.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /getRoundFiveLessonEnrichment/);
+  assert.match(await readFile(new URL("../app/lesson-enrichment-bundle.ts", import.meta.url), "utf8"), /getRoundFiveLessonEnrichment/);
   assert.match(challengeRouter, /buildRoundFivePythonChallenge/);
   assert.match(challengeRouter, /buildRoundFiveSQLChallenge/);
   assert.match(genaiRouter, /buildRoundFiveGenAILab/);

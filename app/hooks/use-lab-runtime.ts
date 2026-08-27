@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { prepareLabRuntime } from "../execution/client";
 import type { ExecutionResult, RuntimeProgress, RuntimeWorkerTrack } from "../execution/types";
 
 export type RunState = "idle" | "running" | "ready" | "error" | "complete";
@@ -58,10 +57,10 @@ export function useLabRuntime(initialCode: string) {
     setExecutionPhase(track === "python"
       ? "Downloading and compiling Python once for this browser tab…"
       : "Downloading and compiling PostgreSQL once for this browser tab…");
-    void prepareLabRuntime(track, (progress: RuntimeProgress) => {
+    void import("../execution/client").then(({ prepareLabRuntime }) => prepareLabRuntime(track, (progress: RuntimeProgress) => {
       setExecutionPhase(progress.detail);
       if (progress.phase === "ready") updateRuntimeReadiness(track, "ready");
-    }).then(() => {
+    })).then(() => {
       updateRuntimeReadiness(track, "ready");
       setExecutionPhase(track === "python" ? "Python runtime ready." : "PostgreSQL runtime ready.");
     }).catch(() => {

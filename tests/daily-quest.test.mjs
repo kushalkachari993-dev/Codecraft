@@ -17,8 +17,7 @@ test("daily quest button opens the existing real lab runtimes", async () => {
   const page = await read("app/page.tsx");
   assert.match(page, /Daily Quest/);
   assert.match(page, /const openDailyQuest/);
-  assert.match(page, /buildPythonChallenge/);
-  assert.match(page, /buildSQLChallenge/);
+  assert.match(page, /loadLabChallenge/);
   assert.match(page, /buildGenAILab/);
   assert.match(page, /setLessonStage\("bonus"\)/);
   assert.match(page, /warmExecutionRuntime/);
