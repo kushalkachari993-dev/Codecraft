@@ -46,6 +46,8 @@ test("CI verifies lint, tests, and the production build", async () => {
   assert.match(workflow, /npm run lint/);
   assert.match(workflow, /npm run test:unit/);
   assert.match(workflow, /npm run build/);
+  assert.match(workflow, /VITE_CLERK_PUBLISHABLE_KEY:\s+pk_test_/);
+  assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-node)@v4/);
   assert.ok(
     workflow.indexOf("npm run build") < workflow.indexOf("npm run test:unit"),
     "CI must build the server-rendered site before tests import dist/server/index.js",
