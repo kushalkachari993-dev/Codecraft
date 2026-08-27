@@ -17,6 +17,8 @@ import { useLabRuntime } from "./hooks/use-lab-runtime";
 import { useDailyQuest } from "./hooks/use-daily-quest";
 import { useLessonEnrichment } from "./hooks/use-lesson-enrichment";
 import { loadLabChallenge, useLabChallenge } from "./hooks/use-lab-challenge";
+import { useLearningHistory } from "./hooks/use-learning-history";
+import { parseLearningLocation, type LearningRoute, type LearningView } from "./navigation";
 import { PacePickerView, TrackPickerView } from "./components/journey-views";
 import {
   AVATARS,
@@ -40,7 +42,7 @@ import {
   type Track,
 } from "./codecraft-catalog";
 
-type View = "tracks" | "paces" | "roadmap" | "quest";
+type View = LearningView;
 type LessonStage = "theory" | "example" | "quiz" | "bonus";
 
 const ProfilePanel = lazy(() => import("./components/profile-panel"));
@@ -50,7 +52,42 @@ const ExampleLessonView = lazy(() => import("./components/lesson-stage-views").t
 const QuizLessonView = lazy(() => import("./components/lesson-stage-views").then((module) => ({ default: module.QuizLessonView })));
 const LabWorkspaceView = lazy(() => import("./components/lesson-stage-views").then((module) => ({ default: module.LabWorkspaceView })));
 
-export default function Home() {
+function getRouteQuests(trackId: Track["id"], paceId: PythonPaceId): Quest[] {
+  if (trackId === "genai") return buildGenAIPaceQuests(paceId);
+  if (trackId === "sql") return buildSQLPaceQuests(paceId);
+  return buildPythonPaceQuests(paceId);
+}
+
+function getRouteModule(trackId: Track["id"], paceId: PythonPaceId, questId: number) {
+  if (trackId === "genai") return getGenAIModule(paceId, questId);
+  if (trackId === "sql") return getSQLModule(paceId, questId);
+  return getPythonModule(paceId, questId);
+}
+
+function isRouteQuestUnlocked(progress: PlayerProgress, trackId: Track["id"], paceId: PythonPaceId, questId: number) {
+  const key = trackId + "-" + paceId;
+  const completed = progress.completed[key] ?? [];
+  if (questId === 1 || completed.includes(questId)) return true;
+  const previousId = questId - 1;
+  if (!completed.includes(previousId)) return false;
+  const previousModule = getRouteModule(trackId, paceId, previousId);
+  return previousId !== previousModule.end || (progress.bonus[key] ?? []).includes(previousId);
+}
+
+export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string }) {
+  const [initialRoute] = useState<LearningRoute>(() => parseLearningLocation(initialPath));
+  const initialTrackId = "trackId" in initialRoute ? initialRoute.trackId : "python";
+  const initialPaceId = "paceId" in initialRoute ? initialRoute.paceId : "beginner";
+  const initialView: View = initialRoute.kind === "paces"
+    ? "paces"
+    : initialRoute.kind === "roadmap"
+      ? "roadmap"
+      : initialRoute.kind === "lesson"
+        ? "quest"
+        : initialRoute.kind === "daily-quest"
+          ? "roadmap"
+          : "tracks";
+  const routeHasChosenPace = initialRoute.kind === "roadmap" || initialRoute.kind === "lesson" || initialRoute.kind === "daily-quest";
   const { getToken, isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useAuth();
   const clerk = useClerk();
   const { user: clerkProfile } = useUser();
@@ -59,19 +96,25 @@ export default function Home() {
     ?? clerkProfile?.primaryEmailAddress?.emailAddress
     ?? "CodeCraft learner";
   const clerkEmail = clerkProfile?.primaryEmailAddress?.emailAddress ?? "";
-  const [view, setView] = useState<View>("tracks");
-  const [activeTrackId, setActiveTrackId] = useState<Track["id"]>("python");
-  const [activePythonPaceId, setActivePythonPaceId] = useState<PythonPaceId>("beginner");
-  const [activeGenAIPaceId, setActiveGenAIPaceId] = useState<GenAIPaceId>("beginner");
-  const [activeSQLPaceId, setActiveSQLPaceId] = useState<SQLPaceId>("beginner");
-  const [hasChosenPythonPace, setHasChosenPythonPace] = useState(false);
-  const [hasChosenGenAIPace, setHasChosenGenAIPace] = useState(false);
-  const [hasChosenSQLPace, setHasChosenSQLPace] = useState(false);
-  const [activeQuestId, setActiveQuestId] = useState(1);
+  const [view, setView] = useState<View>(initialView);
+  const [activeTrackId, setActiveTrackId] = useState<Track["id"]>(initialTrackId);
+  const [activePythonPaceId, setActivePythonPaceId] = useState<PythonPaceId>(initialTrackId === "python" ? initialPaceId : "beginner");
+  const [activeGenAIPaceId, setActiveGenAIPaceId] = useState<GenAIPaceId>(initialTrackId === "genai" ? initialPaceId : "beginner");
+  const [activeSQLPaceId, setActiveSQLPaceId] = useState<SQLPaceId>(initialTrackId === "sql" ? initialPaceId : "beginner");
+  const [hasChosenPythonPace, setHasChosenPythonPace] = useState(routeHasChosenPace && initialTrackId === "python");
+  const [hasChosenGenAIPace, setHasChosenGenAIPace] = useState(routeHasChosenPace && initialTrackId === "genai");
+  const [hasChosenSQLPace, setHasChosenSQLPace] = useState(routeHasChosenPace && initialTrackId === "sql");
+  const [activeQuestId, setActiveQuestId] = useState(initialRoute.kind === "lesson" ? initialRoute.questId : 1);
   const [lessonStage, setLessonStage] = useState<LessonStage>("theory");
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizResult, setQuizResult] = useState<"idle" | "incomplete" | "passed" | "failed">("idle");
   const analyticsSessionTracked = useRef(false);
+  const routeHandlerRef = useRef<(route: LearningRoute) => void>(() => {});
+  const openDailyQuestRef = useRef<() => Promise<void>>(async () => {});
+  const pendingDailyRouteRef = useRef<Extract<LearningRoute, { kind: "daily-quest" }> | null>(
+    initialRoute.kind === "daily-quest" ? initialRoute : null,
+  );
+  const [routeReady, setRouteReady] = useState(false);
   const [storyStep, setStoryStep] = useState(0);
   const [gameToast, setGameToast] = useState("");
   const [firstWorldCelebration, setFirstWorldCelebration] = useState(false);
@@ -98,6 +141,7 @@ export default function Home() {
     tutorialStep, setTutorialStep,
   } = useJourney((savedJourney) => {
     if (!savedJourney.started) return;
+    if ("trackId" in initialRoute) return;
     setActiveTrackId(savedJourney.trackId);
     if (savedJourney.trackId === "python") {
       setActivePythonPaceId(savedJourney.paceId);
@@ -119,6 +163,7 @@ export default function Home() {
     firstName: clerkProfile?.firstName ?? "",
     lastName: clerkProfile?.lastName ?? "",
     getToken,
+    initialOpen: initialRoute.kind === "profile",
     updateName: clerkProfile ? async (firstName, lastName) => {
       await clerkProfile.update({ firstName, lastName });
       await clerkProfile.reload();
@@ -855,6 +900,108 @@ export default function Home() {
     else setView("roadmap");
   };
 
+  useEffect(() => {
+    routeHandlerRef.current = (route) => {
+      setRouteReady(route.kind !== "daily-quest");
+
+      if (route.kind === "profile") {
+        openProfile();
+        return;
+      }
+
+      closeProfile();
+      if (route.kind !== "daily-quest") clearDailyQuestSession();
+
+      if (route.kind === "tracks") {
+        setView("tracks");
+        return;
+      }
+
+      setActiveTrackId(route.trackId);
+      if (route.kind === "paces") {
+        if (route.trackId === "python") setHasChosenPythonPace(false);
+        if (route.trackId === "genai") setHasChosenGenAIPace(false);
+        if (route.trackId === "sql") setHasChosenSQLPace(false);
+        setView("paces");
+        return;
+      }
+
+      if (route.trackId === "python") {
+        setActivePythonPaceId(route.paceId);
+        setHasChosenPythonPace(true);
+      } else if (route.trackId === "genai") {
+        setActiveGenAIPaceId(route.paceId);
+        setHasChosenGenAIPace(true);
+      } else {
+        setActiveSQLPaceId(route.paceId);
+        setHasChosenSQLPace(true);
+      }
+
+      if (route.kind === "roadmap") {
+        setView("roadmap");
+        return;
+      }
+
+      if (route.kind === "daily-quest") {
+        setView("roadmap");
+        pendingDailyRouteRef.current = route;
+        return;
+      }
+
+      const quests = getRouteQuests(route.trackId, route.paceId);
+      const quest = quests.find((candidate) => candidate.id === route.questId);
+      if (!quest || !isRouteQuestUnlocked(progress, route.trackId, route.paceId, route.questId)) {
+        setView("roadmap");
+        return;
+      }
+
+      const key = route.trackId + "-" + route.paceId;
+      const completed = progress.completed[key] ?? [];
+      clearRun();
+      setExecutionResult(null);
+      setActiveQuestId(quest.id);
+      setCode(quest.starterCode);
+      setStatus(completed.includes(quest.id) ? "complete" : "idle");
+      setTerminal(completed.includes(quest.id) ? "Quest already complete. Replay it any time." : "Your output will appear here.");
+      setSceneStep(completed.includes(quest.id) ? quest.steps : 0);
+      setLessonStage("theory");
+      setQuizAnswers({});
+      setQuizResult("idle");
+      setWorldPowerHint("");
+      setEliminatedQuizOptions({});
+      setView("quest");
+    };
+  });
+
+  useEffect(() => {
+    routeHandlerRef.current(parseLearningLocation(window.location.pathname + window.location.search));
+  }, []);
+
+  useEffect(() => {
+    openDailyQuestRef.current = openDailyQuest;
+  });
+
+  useEffect(() => {
+    if (routeReady) return;
+    const pendingDailyRoute = pendingDailyRouteRef.current;
+    if (!pendingDailyRoute) return;
+    if (activeTrack.id !== pendingDailyRoute.trackId || activePaceId !== pendingDailyRoute.paceId) return;
+    pendingDailyRouteRef.current = null;
+    void openDailyQuestRef.current().finally(() => setRouteReady(true));
+  }, [activePaceId, activeTrack.id, routeReady]);
+
+  useLearningHistory({
+    routeReady,
+    view,
+    trackId: activeTrack.id,
+    paceId: activePaceId,
+    questId: activeQuest.id,
+    dailyQuestMode,
+    profileOpen,
+    initialProfileOpen: initialRoute.kind === "profile",
+    onRouteChange: (route) => routeHandlerRef.current(route),
+  });
+
   return (
     <main className={`app-shell track-${activeTrack.id}`}>
       <header className="topbar">
@@ -1237,4 +1384,8 @@ export default function Home() {
       )}
     </main>
   );
+}
+
+export default function Home() {
+  return <CodeCraftApp initialPath="/tracks" />;
 }

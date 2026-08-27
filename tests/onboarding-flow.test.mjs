@@ -54,6 +54,7 @@ test("keeps page orchestration split across domain hooks and view components", a
     "useProfile",
     "useLabRuntime",
     "useDailyQuest",
+    "useLearningHistory",
     "TrackPickerView",
     "ProfilePanel",
     "WorldMap",

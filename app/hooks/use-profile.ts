@@ -22,10 +22,11 @@ type ProfileOptions = {
   lastName: string;
   getToken: () => Promise<string | null>;
   updateName: ((firstName: string, lastName: string | null) => Promise<void>) | null;
+  initialOpen?: boolean;
 };
 
-export function useProfile({ signedIn, firstName, lastName, getToken, updateName }: ProfileOptions) {
-  const [profileOpen, setProfileOpen] = useState(false);
+export function useProfile({ signedIn, firstName, lastName, getToken, updateName, initialOpen = false }: ProfileOptions) {
+  const [profileOpen, setProfileOpen] = useState(initialOpen);
   const [editingName, setEditingName] = useState(false);
   const [firstNameDraft, setFirstNameDraft] = useState("");
   const [lastNameDraft, setLastNameDraft] = useState("");

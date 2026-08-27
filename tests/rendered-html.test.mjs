@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import ts from "typescript";
 
 async function render(pathname = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -41,6 +42,35 @@ test("server-renders the CodeCraft track chooser", async () => {
   assert.match(html, /Choose your pace/);
   assert.doesNotMatch(html, /codex-preview/);
   assert.doesNotMatch(html, /Your site is taking shape/);
+});
+
+test("server-renders URL-backed learning destinations", async () => {
+  const paceResponse = await render("/tracks?track=sql");
+  assert.equal(paceResponse.status, 200);
+
+  const roadmapResponse = await render("/tracks?track=python&pace=beginner");
+  assert.equal(roadmapResponse.status, 200);
+
+  const lessonResponse = await render("/lesson?track=python&pace=beginner&quest=1");
+  assert.equal(lessonResponse.status, 200);
+
+  const profileResponse = await render("/profile");
+  assert.equal(profileResponse.status, 200);
+  assert.match(await profileResponse.text(), /CODECRAFT PLAYER PROFILE/);
+});
+
+test("maps learning views to reversible browser locations", async () => {
+  const source = await readFile(new URL("../app/navigation.ts", import.meta.url), "utf8");
+  const javascript = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const navigation = await import("data:text/javascript;base64," + Buffer.from(javascript).toString("base64"));
+
+  assert.deepEqual(navigation.parseLearningLocation("/tracks?track=sql"), { kind: "paces", trackId: "sql" });
+  assert.deepEqual(navigation.parseLearningLocation("/tracks?track=python&pace=beginner"), { kind: "roadmap", trackId: "python", paceId: "beginner" });
+  assert.deepEqual(navigation.parseLearningLocation("/lesson?track=genai&pace=expert&quest=7"), { kind: "lesson", trackId: "genai", paceId: "expert", questId: 7 });
+  assert.deepEqual(navigation.parseLearningLocation("/daily-quest?track=sql&pace=intermediate"), { kind: "daily-quest", trackId: "sql", paceId: "intermediate" });
+  assert.equal(navigation.learningPathForState({ view: "quest", trackId: "python", paceId: "beginner", questId: 3, dailyQuestMode: false, profileOpen: false }), "/lesson?track=python&pace=beginner&quest=3");
 });
 
 test("runs controlled GenAI lab evaluation without exposing a model credential", async () => {
