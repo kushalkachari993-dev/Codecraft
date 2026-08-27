@@ -1,11 +1,11 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { SignInButton, useAuth, useClerk, useUser } from "@clerk/react";
-import { PYTHON_PACES, type PythonPaceId, type PythonTopic } from "./python-curriculum";
-import { GENAI_PACES, buildGenAILab, validateGenAILab, type GenAIPaceId, type GenAITopic } from "./genai-curriculum";
-import { SQL_PACES, type SQLPaceId, type SQLTopic } from "./sql-curriculum";
-import { executeLab, prepareLabRuntime } from "./execution/client";
+import { PYTHON_PACES, type PythonPaceId } from "./python-curriculum";
+import { GENAI_PACES, buildGenAILab, validateGenAILab, type GenAIPaceId } from "./genai-curriculum";
+import { SQL_PACES, type SQLPaceId } from "./sql-curriculum";
+import { executeLab } from "./execution/client";
 import { buildPythonChallenge, buildSQLChallenge } from "./challenges";
 import { getLessonEnrichment } from "./authored-lessons";
 import { getRoundTwoLessonEnrichment } from "./authored-lessons-round2";
@@ -24,479 +24,54 @@ import { getRoundFourteenLessonEnrichment } from "./authored-lessons-round14";
 import { getRoundFifteenLessonEnrichment } from "./authored-lessons-round15";
 import { getRoundSixteenLessonEnrichment } from "./authored-lessons-round16";
 import { getRoundSeventeenLessonEnrichment } from "./authored-lessons-round17";
-import type { ExecutionResult, RuntimeProgress, RuntimeWorkerTrack } from "./execution/types";
-import { DEFAULT_PROGRESS, mergeProgress, normalizeProgress, type AvatarId, type PlayerProgress } from "./progress";
+import type { ExecutionResult } from "./execution/types";
+import { type AvatarId, type PlayerProgress } from "./progress";
 import BetaFeedback from "./beta-feedback";
 import { trackAnalyticsEvent, type AnalyticsContext, type AnalyticsEventName } from "./analytics-events";
-import { DAILY_QUEST_XP, getDailyQuestIndex, getDailyQuestStreak } from "./daily-quest";
+import { DAILY_QUEST_XP, getDailyQuestStreak } from "./daily-quest";
+import { useJourney } from "./hooks/use-journey";
+import { useProgressSync } from "./hooks/use-progress-sync";
+import { useProfile } from "./hooks/use-profile";
+import { useLabRuntime } from "./hooks/use-lab-runtime";
+import { useDailyQuest } from "./hooks/use-daily-quest";
+import ProfilePanel from "./components/profile-panel";
+import WorldMap from "./components/world-map";
+import { ExampleLessonView, LabWorkspaceView, QuizLessonView, TheoryLessonView } from "./components/lesson-stage-views";
+import { PacePickerView, TrackPickerView } from "./components/journey-views";
+import {
+  AVATARS,
+  FirstRunChecklist,
+  GENAI_PACE_MODULES,
+  PYTHON_PACE_MODULES,
+  SQL_PACE_MODULES,
+  TRACKS,
+  buildGenAIPaceQuests,
+  buildGenAITheory,
+  buildPythonPaceQuests,
+  buildPythonTheory,
+  buildQuiz,
+  buildSQLPaceQuests,
+  buildSQLTheory,
+  getGenAIModule,
+  getPythonModule,
+  getSQLModule,
+  getWorldMechanic,
+  type Quest,
+  type Track,
+} from "./codecraft-catalog";
 
-type RunState = "idle" | "running" | "ready" | "error" | "complete";
-type RuntimeReadiness = "idle" | "preparing" | "ready" | "error";
 type View = "tracks" | "paces" | "roadmap" | "quest";
 type LessonStage = "theory" | "example" | "quiz" | "bonus";
-
-type Quest = {
-  id: number;
-  chapter: string;
-  title: string;
-  concept: string;
-  description: string;
-  objective: string;
-  guide: string;
-  starterCode: string;
-  snippets: Array<{ label: string; code: string }>;
-  xp: number;
-  badge: string;
-  scene: "movement" | "bridge" | "supplies" | "vault";
-  steps: number;
-  validate: (code: string) => string | null;
-};
-
-type QuizQuestion = { question: string; options: string[]; answer: number; explanation: string };
-type TheoryContent = {
-  overview: string;
-  deeper: string;
-  keyIdeas: Array<{ title: string; body: string }>;
-  mentalModel: string;
-  commonMistake: string;
-  checkYourself: string[];
-};
-type CloudUser = { displayName: string; email: string };
-type CloudState = "checking" | "local" | "syncing" | "synced" | "error";
-type SavedSubmission = {
-  submission_id: string;
-  track: Track["id"];
-  pace: PythonPaceId;
-  topic_id: number;
-  topic: string;
-  stage: "attempt" | "submitted";
-  passed: number | boolean;
-  score: number;
-  created_at: number;
-};
-type SubmissionsState = "idle" | "loading" | "ready" | "error";
-
-type Track = {
-  id: "python" | "genai" | "sql";
-  label: string;
-  world: string;
-  kicker: string;
-  description: string;
-  outcome: string;
-  mission: string;
-  energy: string;
-  icon: string;
-  worldTwo: string;
-  nextWorld: string;
-};
-
-type JourneyPreferences = {
-  trackId: Track["id"];
-  paceId: PythonPaceId;
-  started: boolean;
-  tutorialComplete: boolean;
-};
-
-type WorldPowerKind = "scan" | "recall" | "override";
-type WorldMechanic = {
-  event: string;
-  power: string;
-  kind: WorldPowerKind;
-  description: string;
-  effect: string;
-};
-
-const TRACKS: Track[] = [
-  { id: "python", label: "Python", world: "Logic Highlands", worldTwo: "The Function Relay", kicker: "PYTHON TRAIL", description: "Learn programming foundations while Byte restores the living systems of the Code Realms.", outcome: "Commands · Loops · Functions · Collections", mission: "Repair the Logic Relay and reconnect every automation node.", energy: "Lumen shards", icon: "Py", nextWorld: "Object Odyssey" },
-  { id: "genai", label: "GenAI", world: "Prompt Frontier", worldTwo: "The Agent Foundry", kicker: "AI EXPLORER TRAIL", description: "Learn how to prompt, guide, structure, and evaluate intelligent systems across a fractured signal frontier.", outcome: "Prompts · Grounding · Tools · Evaluation", mission: "Rebuild the Signal Archive and teach its agents to respond reliably.", energy: "Echo cores", icon: "AI", nextWorld: "Multimodal Metropolis" },
-  { id: "sql", label: "SQL", world: "Data Depths", worldTwo: "The Analytics Citadel", kicker: "DATABASE TRAIL", description: "Explore a buried data realm using queries that reveal, connect, and analyze its records.", outcome: "SELECT · JOIN · Subqueries · Windows", mission: "Restore the Data Nexus and recover the realm's lost records.", energy: "Index crystals", icon: "DB", nextWorld: "Performance Nexus" },
-];
-
-const JOURNEY_STORAGE_KEY = "codecraft-journey-v1";
-const DEFAULT_JOURNEY: JourneyPreferences = { trackId: "python", paceId: "beginner", started: false, tutorialComplete: false };
-const TRACK_MATCH: Record<Track["id"], string> = {
-  python: "Best for programming foundations, automation, APIs, and backend development.",
-  genai: "Best for prompts, RAG, agents, evaluation, and production AI applications.",
-  sql: "Best for analytics, databases, data engineering, and performance work.",
-};
-const PACE_MATCH: Record<PythonPaceId, string> = {
-  beginner: "New to the subject or rebuilding foundations",
-  intermediate: "Comfortable with the basics and ready to build",
-  expert: "Preparing for production systems and architecture",
-};
-
-const WORLD_MECHANICS: Record<Track["id"], WorldMechanic[]> = {
-  python: [
-    { event: "Syntax Storm", power: "Signal Scanner", kind: "scan", description: "Corrupted syntax is hiding valid paths among noisy decoys.", effect: "Remove two incorrect checkpoint choices." },
-    { event: "Inventory Fog", power: "Memory Cache", kind: "recall", description: "The world periodically hides what each tool is meant to do.", effect: "Recall a lesson model and expose a dangerous mistake." },
-    { event: "Logic Lock", power: "Byte Override", kind: "override", description: "A logic gate must be patched before the relay can continue.", effect: "Byte repairs one unanswered checkpoint node." },
-    { event: "Debug Rift", power: "Trace Scanner", kind: "scan", description: "False traces split the program into unstable branches.", effect: "Remove two incorrect checkpoint choices." },
-    { event: "Algorithm Wilds", power: "Pattern Cache", kind: "recall", description: "Repeated structures are concealed by shifting terrain.", effect: "Recall the mental model behind the current topic." },
-    { event: "Runtime Breach", power: "Core Override", kind: "override", description: "The runtime is resisting the final system repair.", effect: "Byte repairs one unanswered checkpoint node." },
-  ],
-  genai: [
-    { event: "Prompt Static", power: "Intent Scanner", kind: "scan", description: "Ambiguous signals are producing convincing but incorrect paths.", effect: "Remove two incorrect checkpoint choices." },
-    { event: "Context Eclipse", power: "Context Cache", kind: "recall", description: "Vital context has fallen outside the active signal window.", effect: "Recover the topic mental model and safety warning." },
-    { event: "Agent Loop", power: "Loop Override", kind: "override", description: "An agent is repeating a broken decision cycle.", effect: "Byte repairs one unanswered checkpoint node." },
-    { event: "Grounding Drift", power: "Source Scanner", kind: "scan", description: "Unsupported claims are leaking into the archive.", effect: "Remove two incorrect checkpoint choices." },
-    { event: "Evaluation Fog", power: "Rubric Cache", kind: "recall", description: "The success criteria have been scattered across the frontier.", effect: "Recover the topic mental model and safety warning." },
-    { event: "Routing Failure", power: "Model Override", kind: "override", description: "The wrong system is answering the realm requests.", effect: "Byte repairs one unanswered checkpoint node." },
-  ],
-  sql: [
-    { event: "Query Static", power: "Planner Scanner", kind: "scan", description: "Decoy query paths are blocking the correct result set.", effect: "Remove two incorrect checkpoint choices." },
-    { event: "Schema Fog", power: "Schema Cache", kind: "recall", description: "Table relationships have faded from the data map.", effect: "Recover the topic mental model and common query trap." },
-    { event: "Lock Contention", power: "Transaction Override", kind: "override", description: "A blocked transaction is freezing the world relay.", effect: "Byte repairs one unanswered checkpoint node." },
-    { event: "Index Rift", power: "Index Scanner", kind: "scan", description: "The fastest path is buried among expensive plans.", effect: "Remove two incorrect checkpoint choices." },
-    { event: "Plan Eclipse", power: "Explain Cache", kind: "recall", description: "The optimizer reasoning is hidden from the expedition.", effect: "Recover the topic mental model and common query trap." },
-    { event: "Recovery Breach", power: "WAL Override", kind: "override", description: "The final data checkpoint needs a safe recovery patch.", effect: "Byte repairs one unanswered checkpoint node." },
-  ],
-};
-
-function getWorldMechanic(trackId: Track["id"], worldNumber: number): WorldMechanic {
-  const mechanics = WORLD_MECHANICS[trackId];
-  return mechanics[(Math.max(1, worldNumber) - 1) % mechanics.length];
-}
-
-function loadJourneyPreferences(): JourneyPreferences {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(JOURNEY_STORAGE_KEY) ?? "{}") as Partial<JourneyPreferences>;
-    const trackId = parsed.trackId === "genai" || parsed.trackId === "sql" ? parsed.trackId : "python";
-    const paceId = parsed.paceId === "intermediate" || parsed.paceId === "expert" ? parsed.paceId : "beginner";
-    return { trackId, paceId, started: parsed.started === true, tutorialComplete: parsed.tutorialComplete === true };
-  } catch {
-    return DEFAULT_JOURNEY;
-  }
-}
-
-function FirstRunChecklist({ activeStep }: { activeStep: number }) {
-  const steps = ["Choose a track", "Set your pace", "Learn the game loop", "Complete your first lesson"];
-  return (
-    <ol className="first-run-checklist" aria-label="Getting started progress">
-      {steps.map((step, index) => <li className={index < activeStep ? "done" : index === activeStep ? "active" : ""} key={step}><span>{index < activeStep ? "OK" : index + 1}</span><strong>{step}</strong></li>)}
-    </ol>
-  );
-}
-
-const AVATARS: Array<{ id: AvatarId; name: string; glyph: string; description: string; unlockAt: number }> = [
-  { id: "relay-scout", name: "Relay Scout", glyph: "◇", description: "Fast, curious, and tuned to hidden signals.", unlockAt: 0 },
-  { id: "signal-mage", name: "Signal Mage", glyph: "✦", description: "Channels knowledge into powerful system repairs.", unlockAt: 5 },
-  { id: "core-runner", name: "Core Runner", glyph: "◆", description: "Built for world projects and deep system missions.", unlockAt: 15 },
-];
-
-const PYTHON_PACE_XP: Record<PythonPaceId, number> = { beginner: 35, intermediate: 60, expert: 90 };
-const PYTHON_PACE_BADGES: Record<PythonPaceId, string> = { beginner: "Trail", intermediate: "Forge", expert: "Mastery" };
-const PYTHON_PACE_MODULES: Record<PythonPaceId, Array<{ name: string; size: number }>> = {
-  beginner: [
-    { name: "Spawn Point", size: 5 },
-    { name: "Inventory Basics", size: 4 },
-    { name: "Logic Vaults", size: 5 },
-    { name: "Builder Toolkit", size: 7 },
-    { name: "Algorithm Grove", size: 3 },
-  ],
-  intermediate: [
-    { name: "Object Workshop", size: 5 },
-    { name: "Pythonic Forge", size: 5 },
-    { name: "Standard Library Citadel", size: 6 },
-    { name: "Web Gateway", size: 5 },
-    { name: "Algorithm Arena", size: 5 },
-    { name: "Project Foundry", size: 3 },
-  ],
-  expert: [
-    { name: "Object Core", size: 4 },
-    { name: "Runtime Depths", size: 6 },
-    { name: "Type & API Forge", size: 5 },
-    { name: "Deployment Citadel", size: 6 },
-    { name: "CPython Lab", size: 4 },
-    { name: "Systems Frontier", size: 5 },
-  ],
-};
-
-function getPythonModule(paceId: PythonPaceId, questId: number) {
-  let start = 1;
-  for (const [index, module] of PYTHON_PACE_MODULES[paceId].entries()) {
-    const end = start + module.size - 1;
-    if (questId >= start && questId <= end) return { ...module, number: index + 1, start, end };
-    start = end + 1;
-  }
-  return { ...PYTHON_PACE_MODULES[paceId][0], number: 1, start: 1, end: PYTHON_PACE_MODULES[paceId][0].size };
-}
-
-function buildPythonPaceQuests(paceId: PythonPaceId): Quest[] {
-  const pace = PYTHON_PACES.find((item) => item.id === paceId) ?? PYTHON_PACES[0];
-  const scenes: Quest["scene"][] = ["movement", "bridge", "supplies", "vault"];
-
-  return pace.topics.map((topic, index) => ({
-    id: index + 1,
-    chapter: topic.title,
-    title: topic.title,
-    concept: topic.title,
-    description: topic.summary,
-    objective: topic.learningGoal,
-    guide: topic.summary,
-    starterCode: topic.example,
-    snippets: [],
-    xp: PYTHON_PACE_XP[paceId] + Math.floor(index / 6) * 5,
-    badge: `${topic.title} ${PYTHON_PACE_BADGES[paceId]}`,
-    scene: scenes[index % scenes.length],
-    steps: 3 + (index % 2),
-    validate: (code) => {
-      const meaningfulCode = code
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith("#"))
-        .join("");
-      return meaningfulCode.length >= 8
-        ? null
-        : `Add a small working example that demonstrates ${topic.title}.`;
-    },
-  }));
-}
-
-function buildPythonTheory(topic: PythonTopic): TheoryContent {
-  return {
-    overview: topic.summary,
-    deeper: topic.learningGoal,
-    keyIdeas: topic.keyIdeas,
-    mentalModel: topic.mentalModel,
-    commonMistake: topic.commonMistake,
-    checkYourself: [
-      `Can I explain ${topic.title} in my own words?`,
-      "Can I predict what the example will do before running it?",
-      "Can I identify when this idea is useful in a real project?",
-    ],
-  };
-}
-
-const GENAI_PACE_XP: Record<GenAIPaceId, number> = { beginner: 40, intermediate: 70, expert: 100 };
-const GENAI_PACE_BADGES: Record<GenAIPaceId, string> = { beginner: "Signal", intermediate: "Systems", expert: "Architect" };
-const GENAI_PACE_MODULES: Record<GenAIPaceId, Array<{ name: string; size: number }>> = {
-  beginner: [
-    { name: "Intelligence Foundations", size: 5 },
-    { name: "Token & Context Lab", size: 4 },
-    { name: "Reliable Model Gateway", size: 5 },
-    { name: "Retrieval Frontier", size: 4 },
-  ],
-  intermediate: [
-    { name: "Transformer Systems", size: 5 },
-    { name: "Search & RAG Grid", size: 5 },
-    { name: "Agent Relay", size: 5 },
-    { name: "Workflow Graphs", size: 5 },
-    { name: "Safety & Scale", size: 5 },
-  ],
-  expert: [
-    { name: "Model Engine", size: 5 },
-    { name: "Inference Grid", size: 5 },
-    { name: "Context & Agent Core", size: 5 },
-    { name: "Evaluation Operations", size: 5 },
-    { name: "Reliability & Security", size: 4 },
-    { name: "Platform Frontier", size: 4 },
-  ],
-};
-
-function getGenAIModule(paceId: GenAIPaceId, questId: number) {
-  let start = 1;
-  for (const [index, module] of GENAI_PACE_MODULES[paceId].entries()) {
-    const end = start + module.size - 1;
-    if (questId >= start && questId <= end) return { ...module, number: index + 1, start, end };
-    start = end + 1;
-  }
-  return { ...GENAI_PACE_MODULES[paceId][0], number: 1, start: 1, end: GENAI_PACE_MODULES[paceId][0].size };
-}
-
-function buildGenAIPaceQuests(paceId: GenAIPaceId): Quest[] {
-  const pace = GENAI_PACES.find((item) => item.id === paceId) ?? GENAI_PACES[0];
-  const scenes: Quest["scene"][] = ["vault", "movement", "bridge", "supplies"];
-
-  return pace.topics.map((topic, index) => ({
-    id: index + 1,
-    chapter: topic.title,
-    title: topic.title,
-    concept: topic.title,
-    description: topic.summary,
-    objective: topic.learningGoal,
-    guide: topic.summary,
-    starterCode: topic.example,
-    snippets: [],
-    xp: GENAI_PACE_XP[paceId] + Math.floor(index / 5) * 5,
-    badge: topic.title + " " + GENAI_PACE_BADGES[paceId],
-    scene: scenes[index % scenes.length],
-    steps: 3 + (index % 2),
-    validate: (code) => {
-      const meaningfulCode = code
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith("#"))
-        .join("");
-      return meaningfulCode.length >= 8
-        ? null
-        : "Add a small working example that demonstrates " + topic.title + ".";
-    },
-  }));
-}
-
-function buildGenAITheory(topic: GenAITopic): TheoryContent {
-  return {
-    overview: topic.summary,
-    deeper: topic.learningGoal,
-    keyIdeas: topic.keyIdeas,
-    mentalModel: topic.mentalModel,
-    commonMistake: topic.commonMistake,
-    checkYourself: [
-      "Can I explain " + topic.title + " in my own words?",
-      "Can I trace where this concept fits in a complete GenAI system?",
-      "Can I name one failure mode and the control that addresses it?",
-    ],
-  };
-}
-
-const SQL_PACE_XP: Record<SQLPaceId, number> = { beginner: 40, intermediate: 70, expert: 100 };
-const SQL_PACE_BADGES: Record<SQLPaceId, string> = { beginner: "Query", intermediate: "Engineer", expert: "Architect" };
-const SQL_PACE_MODULES: Record<SQLPaceId, Array<{ name: string; size: number }>> = {
-  beginner: [
-    { name: "Data Foundations", size: 5 },
-    { name: "Query Relay", size: 5 },
-    { name: "Aggregation Lab", size: 5 },
-    { name: "Integrity Network", size: 4 },
-    { name: "Relational Design", size: 4 },
-  ],
-  intermediate: [
-    { name: "Advanced Query Grid", size: 4 },
-    { name: "Analytical Engine", size: 5 },
-    { name: "Schema & Index Lab", size: 4 },
-    { name: "Transaction Core", size: 5 },
-    { name: "Automation & Data", size: 4 },
-    { name: "Production Access", size: 4 },
-  ],
-  expert: [
-    { name: "Optimizer Core", size: 5 },
-    { name: "Storage & Concurrency", size: 5 },
-    { name: "Durability Grid", size: 5 },
-    { name: "Production Platform", size: 5 },
-    { name: "Performance & Analytics", size: 5 },
-    { name: "Architecture Frontier", size: 4 },
-  ],
-};
-
-function getSQLModule(paceId: SQLPaceId, questId: number) {
-  let start = 1;
-  for (const [index, module] of SQL_PACE_MODULES[paceId].entries()) {
-    const end = start + module.size - 1;
-    if (questId >= start && questId <= end) return { ...module, number: index + 1, start, end };
-    start = end + 1;
-  }
-  return { ...SQL_PACE_MODULES[paceId][0], number: 1, start: 1, end: SQL_PACE_MODULES[paceId][0].size };
-}
-
-function buildSQLPaceQuests(paceId: SQLPaceId): Quest[] {
-  const pace = SQL_PACES.find((item) => item.id === paceId) ?? SQL_PACES[0];
-  const scenes: Quest["scene"][] = ["supplies", "vault", "bridge", "movement"];
-
-  return pace.topics.map((topic, index) => ({
-    id: index + 1,
-    chapter: topic.title,
-    title: topic.title,
-    concept: topic.title,
-    description: topic.summary,
-    objective: topic.learningGoal,
-    guide: topic.summary,
-    starterCode: topic.example,
-    snippets: [],
-    xp: SQL_PACE_XP[paceId] + Math.floor(index / 5) * 5,
-    badge: topic.title + " " + SQL_PACE_BADGES[paceId],
-    scene: scenes[index % scenes.length],
-    steps: 3 + (index % 2),
-    validate: (code) => {
-      const meaningfulCode = code
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith("--") && !line.startsWith("#"))
-        .join("");
-      return meaningfulCode.length >= 8
-        ? null
-        : "Add a small working SQL example that demonstrates " + topic.title + ".";
-    },
-  }));
-}
-
-function buildSQLTheory(topic: SQLTopic): TheoryContent {
-  return {
-    overview: topic.summary,
-    deeper: topic.learningGoal,
-    keyIdeas: topic.keyIdeas,
-    mentalModel: topic.mentalModel,
-    commonMistake: topic.commonMistake,
-    checkYourself: [
-      "Can I explain " + topic.title + " in my own words?",
-      "Can I predict the rows or system behavior before running the example?",
-      "Can I name the correctness or performance risk this concept addresses?",
-    ],
-  };
-}
-
-function rotateQuizOptions(question: QuizQuestion, offset: number): QuizQuestion {
-  const shift = offset % question.options.length;
-  return {
-    ...question,
-    options: [...question.options.slice(shift), ...question.options.slice(0, shift)],
-    answer: (question.answer - shift + question.options.length) % question.options.length,
-  };
-}
-
-function buildQuiz(quest: Quest, authored: QuizQuestion[] | null = null): QuizQuestion[] {
-  if (authored) return authored;
-  const firstCodeLine = quest.starterCode.split("\n").find((line) => line.trim() && !line.trim().startsWith("#")) ?? quest.starterCode;
-  return [
-    {
-      question: `What is the main idea behind ${quest.concept}?`,
-      options: [quest.guide, "It changes the visual theme of the editor.", "It skips the program and completes the quest.", "It stores progress without running code."],
-      answer: 0,
-      explanation: quest.guide,
-    },
-    {
-      question: "Which line is part of a correct solution for this section?",
-      options: [firstCodeLine, "skip_quest()", "answer = always_true", "delete_world()"],
-      answer: 0,
-      explanation: `The solution begins with: ${firstCodeLine}`,
-    },
-    {
-      question: "What should the finished program accomplish?",
-      options: [quest.objective, "Only display a decorative message", "Unlock every track immediately", "Run without using the lesson concept"],
-      answer: 0,
-      explanation: `The section objective is: ${quest.objective}.`,
-    },
-  ].map((question, index) => rotateQuizOptions(question, quest.id + index));
-}
-
-function loadProgress(): PlayerProgress {
-  try {
-    const saved = window.localStorage.getItem("codecraft-progress-v3");
-    if (saved) {
-      return normalizeProgress(JSON.parse(saved));
-    }
-
-    const previous = window.localStorage.getItem("codecraft-progress-v2");
-    if (previous) {
-      const parsed = JSON.parse(previous) as { xp?: number; completed?: number[] };
-      return normalizeProgress({
-        xp: Number.isFinite(parsed.xp) ? Number(parsed.xp) : DEFAULT_PROGRESS.xp,
-        completed: { python: Array.isArray(parsed.completed) ? parsed.completed : [] },
-        coding: { python: Array.isArray(parsed.completed) ? parsed.completed : [] },
-      });
-    }
-
-    const legacyXp = Number(window.localStorage.getItem("codecraft-xp"));
-    return Number.isFinite(legacyXp) && legacyXp > 0
-      ? normalizeProgress({ xp: legacyXp })
-      : DEFAULT_PROGRESS;
-  } catch {
-    return DEFAULT_PROGRESS;
-  }
-}
 
 export default function Home() {
   const { getToken, isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useAuth();
   const clerk = useClerk();
   const { user: clerkProfile } = useUser();
+  const clerkDisplayName = clerkProfile?.fullName
+    ?? clerkProfile?.firstName
+    ?? clerkProfile?.primaryEmailAddress?.emailAddress
+    ?? "CodeCraft learner";
+  const clerkEmail = clerkProfile?.primaryEmailAddress?.emailAddress ?? "";
   const [view, setView] = useState<View>("tracks");
   const [activeTrackId, setActiveTrackId] = useState<Track["id"]>("python");
   const [activePythonPaceId, setActivePythonPaceId] = useState<PythonPaceId>("beginner");
@@ -506,48 +81,62 @@ export default function Home() {
   const [hasChosenGenAIPace, setHasChosenGenAIPace] = useState(false);
   const [hasChosenSQLPace, setHasChosenSQLPace] = useState(false);
   const [activeQuestId, setActiveQuestId] = useState(1);
-  const [code, setCode] = useState(() => buildPythonPaceQuests("beginner")[0].starterCode);
-  const [status, setStatus] = useState<RunState>("idle");
-  const [terminal, setTerminal] = useState("Your output will appear here.");
-  const [sceneStep, setSceneStep] = useState(0);
-  const [progress, setProgress] = useState<PlayerProgress>(() => typeof window === "undefined" ? DEFAULT_PROGRESS : loadProgress());
   const [lessonStage, setLessonStage] = useState<LessonStage>("theory");
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizResult, setQuizResult] = useState<"idle" | "incomplete" | "passed" | "failed">("idle");
-  const runToken = useRef(0);
   const analyticsSessionTracked = useRef(false);
-  const executionAbort = useRef<AbortController | null>(null);
-  const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
-  const [executionPhase, setExecutionPhase] = useState("");
-  const [runtimeReadiness, setRuntimeReadiness] = useState<Record<RuntimeWorkerTrack, RuntimeReadiness>>({ python: "idle", sql: "idle" });
-  const [cloudUser, setCloudUser] = useState<CloudUser | null>(null);
-  const [cloudState, setCloudState] = useState<CloudState>("checking");
-  const [progressReady, setProgressReady] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [editingName, setEditingName] = useState(false);
-  const [firstNameDraft, setFirstNameDraft] = useState("");
-  const [lastNameDraft, setLastNameDraft] = useState("");
-  const [nameSaveState, setNameSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [nameError, setNameError] = useState("");
-  const [savedSubmissions, setSavedSubmissions] = useState<SavedSubmission[]>([]);
-  const [submissionsState, setSubmissionsState] = useState<SubmissionsState>("idle");
   const [storyStep, setStoryStep] = useState(0);
   const [gameToast, setGameToast] = useState("");
-  const [journey, setJourney] = useState<JourneyPreferences>(DEFAULT_JOURNEY);
-  const [goalRecommendation, setGoalRecommendation] = useState<Track["id"]>("python");
-  const [paceRecommendation, setPaceRecommendation] = useState<PythonPaceId>("beginner");
-  const [tutorialOpen, setTutorialOpen] = useState(false);
-  const [tutorialStep, setTutorialStep] = useState(0);
   const [firstWorldCelebration, setFirstWorldCelebration] = useState(false);
   const [worldFeedbackPrompt, setWorldFeedbackPrompt] = useState(false);
   const [worldPowerHint, setWorldPowerHint] = useState("");
   const [eliminatedQuizOptions, setEliminatedQuizOptions] = useState<Record<number, number[]>>({});
-  const [dailyQuestSession, setDailyQuestSession] = useState<{ date: string; key: string; questId: number } | null>(null);
-  const clerkDisplayName = clerkProfile?.fullName
-    ?? clerkProfile?.firstName
-    ?? clerkProfile?.primaryEmailAddress?.emailAddress
-    ?? "CodeCraft learner";
-  const clerkEmail = clerkProfile?.primaryEmailAddress?.emailAddress ?? "";
+
+  const {
+    code, setCode, status, setStatus, terminal, setTerminal, sceneStep, setSceneStep,
+    executionResult, setExecutionResult, executionPhase, setExecutionPhase,
+    runtimeReadiness, updateRuntimeReadiness, clearRun, startRun, isCurrentRun,
+    finishRun, warmExecutionRuntime, stopExecution: stopRuntimeExecution,
+  } = useLabRuntime(buildPythonPaceQuests("beginner")[0].starterCode);
+  const { progress, persistProgress, cloudUser, cloudState } = useProgressSync({
+    clerkLoaded: Boolean(clerkLoaded),
+    clerkSignedIn: Boolean(clerkSignedIn),
+    displayName: clerkDisplayName,
+    email: clerkEmail,
+    getToken,
+  });
+  const {
+    journey, persistJourney, goalRecommendation, setGoalRecommendation,
+    paceRecommendation, setPaceRecommendation, tutorialOpen, setTutorialOpen,
+    tutorialStep, setTutorialStep,
+  } = useJourney((savedJourney) => {
+    if (!savedJourney.started) return;
+    setActiveTrackId(savedJourney.trackId);
+    if (savedJourney.trackId === "python") {
+      setActivePythonPaceId(savedJourney.paceId);
+      setHasChosenPythonPace(true);
+    } else if (savedJourney.trackId === "genai") {
+      setActiveGenAIPaceId(savedJourney.paceId);
+      setHasChosenGenAIPace(true);
+    } else {
+      setActiveSQLPaceId(savedJourney.paceId);
+      setHasChosenSQLPace(true);
+    }
+  });
+  const {
+    profileOpen, openProfile, closeProfile, editingName, beginNameEdit, cancelNameEdit,
+    firstNameDraft, setFirstNameDraft, lastNameDraft, setLastNameDraft,
+    nameSaveState, nameError, saveProfileName, savedSubmissions, submissionsState,
+  } = useProfile({
+    signedIn: Boolean(clerkSignedIn),
+    firstName: clerkProfile?.firstName ?? "",
+    lastName: clerkProfile?.lastName ?? "",
+    getToken,
+    updateName: clerkProfile ? async (firstName, lastName) => {
+      await clerkProfile.update({ firstName, lastName });
+      await clerkProfile.reload();
+    } : null,
+  });
 
   const activeTrack = TRACKS.find((track) => track.id === activeTrackId) ?? TRACKS[0];
   const activePythonPace = PYTHON_PACES.find((pace) => pace.id === activePythonPaceId) ?? PYTHON_PACES[0];
@@ -639,10 +228,15 @@ export default function Home() {
     : pendingRequiredProject
       ? [`${pendingRequiredProject.title} is understood. Now we need to prove it under pressure.`, `The guardian simulation is active in ${activeWorlds[currentWorldIndex]?.name ?? "this world"}. This is your boss mission.`, "Pass every runtime check and the next world gate will open."]
       : [`Signal detected in ${activeWorlds[currentWorldIndex]?.name ?? "this world"}. The next unstable system is ${nextQuest?.title ?? activeQuest.title}.`, "Each topic repairs part of the landscape. Watch the world node energize after your checkpoint.", "Theory gives us the map. Your choices and code bring the realm back online."];
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const dailyQuestMode = dailyQuestSession?.date === todayKey;
-  const dailyQuestCompletedToday = progress.game.dailyQuestDate === todayKey && progress.game.dailyQuestCompleted;
-  const dailyQuestPreview = activeQuests[getDailyQuestIndex(todayKey, activeTrack.id, activePaceId, activeQuests.length)] ?? activeQuests[0];
+  const {
+    session: dailyQuestSession,
+    setSession: setDailyQuestSession,
+    clearSession: clearDailyQuestSession,
+    todayKey,
+    dailyQuestMode,
+    completedToday: dailyQuestCompletedToday,
+    preview: dailyQuestPreview,
+  } = useDailyQuest({ progress, quests: activeQuests, trackId: activeTrack.id, paceId: activePaceId });
   const achievements = [
     { id: "first-signal", icon: "◇", name: "First Signal", detail: "Complete your first topic", unlocked: totalBadges >= 1 },
     { id: "badge-hunter", icon: "✦", name: "Badge Hunter", detail: "Recover 10 topic badges", unlocked: totalBadges >= 10 },
@@ -719,105 +313,6 @@ export default function Home() {
   }, [clerkLoaded, clerkSignedIn, getToken]);
 
   useEffect(() => {
-    const restoreTimer = window.setTimeout(() => {
-      const savedJourney = loadJourneyPreferences();
-      setJourney(savedJourney);
-      setGoalRecommendation(savedJourney.trackId);
-      setPaceRecommendation(savedJourney.paceId);
-      if (!savedJourney.started) return;
-      setActiveTrackId(savedJourney.trackId);
-      if (savedJourney.trackId === "python") {
-        setActivePythonPaceId(savedJourney.paceId);
-        setHasChosenPythonPace(true);
-      } else if (savedJourney.trackId === "genai") {
-        setActiveGenAIPaceId(savedJourney.paceId);
-        setHasChosenGenAIPace(true);
-      } else {
-        setActiveSQLPaceId(savedJourney.paceId);
-        setHasChosenSQLPace(true);
-      }
-    }, 0);
-    return () => window.clearTimeout(restoreTimer);
-  }, []);
-
-  useEffect(() => {
-    if (!clerkLoaded) return;
-    const controller = new AbortController();
-    const localProgress = loadProgress();
-    void Promise.resolve().then(async () => {
-      if (!clerkSignedIn) {
-        setCloudUser(null);
-        setCloudState("local");
-        setProgressReady(true);
-        return null;
-      }
-      const token = await getToken();
-      if (!token) throw new Error("Clerk session token is unavailable");
-      return fetch("/api/progress", { signal: controller.signal, headers: { accept: "application/json", authorization: `Bearer ${token}` } });
-    })
-      .then(async (response) => {
-        if (!response) return null;
-        if (!response.ok) throw new Error("Progress lookup failed");
-        return response.json() as Promise<{ user: CloudUser | null; progress: PlayerProgress | null }>;
-      })
-      .then((payload) => {
-        if (!payload) return;
-        if (!payload.user) {
-          setCloudState("local");
-          return;
-        }
-        const merged = mergeProgress(localProgress, normalizeProgress(payload.progress));
-        window.localStorage.setItem("codecraft-progress-v3", JSON.stringify(merged));
-        window.localStorage.setItem("codecraft-xp", String(merged.xp));
-        setProgress(merged);
-        setCloudUser({ displayName: clerkDisplayName, email: clerkEmail });
-        setCloudState("syncing");
-      })
-      .catch((error: unknown) => {
-        if ((error as { name?: string }).name !== "AbortError") setCloudState("local");
-      })
-      .finally(() => setProgressReady(true));
-    return () => {
-      controller.abort();
-      runToken.current += 1;
-      executionAbort.current?.abort();
-    };
-  }, [clerkDisplayName, clerkEmail, clerkLoaded, clerkSignedIn, getToken]);
-
-  useEffect(() => {
-    if (!progressReady || !cloudUser || !clerkSignedIn) return;
-    const saveTimer = window.setTimeout(() => {
-      setCloudState("syncing");
-      void getToken().then((token) => {
-        if (!token) throw new Error("Clerk session token is unavailable");
-        return fetch("/api/progress", {
-          method: "PUT",
-          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({ progress }),
-        });
-      }).then((response) => {
-        if (!response.ok) throw new Error("Cloud save failed");
-        setCloudState("synced");
-      }).catch(() => setCloudState("error"));
-    }, 650);
-    return () => window.clearTimeout(saveTimer);
-  }, [clerkSignedIn, cloudUser, getToken, progress, progressReady]);
-
-  useEffect(() => {
-    if (!profileOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setProfileOpen(false);
-    };
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [profileOpen]);
-
-  useEffect(() => {
     if (!tutorialOpen && !firstWorldCelebration) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -831,48 +326,7 @@ export default function Home() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [firstWorldCelebration, tutorialOpen]);
-
-  useEffect(() => {
-    if (!profileOpen || !clerkSignedIn) return;
-    const controller = new AbortController();
-    void Promise.resolve()
-      .then(() => {
-        setSubmissionsState("loading");
-        return getToken();
-      })
-      .then((token) => {
-        if (!token) throw new Error("Clerk session token is unavailable");
-        return fetch("/api/submissions", {
-          signal: controller.signal,
-          headers: { accept: "application/json", authorization: `Bearer ${token}` },
-        });
-      })
-      .then((response) => {
-        if (!response.ok) throw new Error("Submissions lookup failed");
-        return response.json() as Promise<{ submissions?: SavedSubmission[] }>;
-      })
-      .then((payload) => {
-        setSavedSubmissions(Array.isArray(payload.submissions) ? payload.submissions : []);
-        setSubmissionsState("ready");
-      })
-      .catch((error: unknown) => {
-        if ((error as { name?: string }).name !== "AbortError") setSubmissionsState("error");
-      });
-    return () => controller.abort();
-  }, [clerkSignedIn, getToken, profileOpen]);
-
-  const persistProgress = (nextProgress: PlayerProgress) => {
-    const normalized = normalizeProgress(nextProgress);
-    window.localStorage.setItem("codecraft-progress-v3", JSON.stringify(normalized));
-    window.localStorage.setItem("codecraft-xp", String(normalized.xp));
-    setProgress(normalized);
-  };
-
-  const persistJourney = (next: JourneyPreferences) => {
-    window.localStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify(next));
-    setJourney(next);
-  };
+  }, [firstWorldCelebration, setTutorialOpen, tutorialOpen]);
 
   const playGameSound = (kind: "select" | "complete" | "boss" = "select") => {
     if (!progress.game.soundEnabled || typeof window === "undefined") return;
@@ -948,53 +402,6 @@ export default function Home() {
     if (soundEnabled) window.setTimeout(() => playGameSound("select"), 0);
   };
 
-  const openProfile = () => {
-    setFirstNameDraft(clerkProfile?.firstName ?? "");
-    setLastNameDraft(clerkProfile?.lastName ?? "");
-    setNameSaveState("idle");
-    setNameError("");
-    setSavedSubmissions([]);
-    setSubmissionsState(clerkSignedIn ? "loading" : "idle");
-    setEditingName(false);
-    setProfileOpen(true);
-  };
-
-  const beginNameEdit = () => {
-    setFirstNameDraft(clerkProfile?.firstName ?? "");
-    setLastNameDraft(clerkProfile?.lastName ?? "");
-    setNameSaveState("idle");
-    setNameError("");
-    setEditingName(true);
-  };
-
-  const closeProfile = () => {
-    setEditingName(false);
-    setProfileOpen(false);
-  };
-
-  const saveProfileName = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!clerkProfile) return;
-    const firstName = firstNameDraft.trim();
-    const lastName = lastNameDraft.trim();
-    if (!firstName) {
-      setNameSaveState("error");
-      setNameError("Enter a first name or player name.");
-      return;
-    }
-    setNameSaveState("saving");
-    setNameError("");
-    try {
-      await clerkProfile.update({ firstName, lastName: lastName || null });
-      await clerkProfile.reload();
-      setNameSaveState("saved");
-      setEditingName(false);
-    } catch {
-      setNameSaveState("error");
-      setNameError("We could not save that name. Check it and try again.");
-    }
-  };
-
   const saveSubmission = (result: ExecutionResult, stage: "attempt" | "submitted") => {
     if (!cloudUser) return;
     const passedChecks = result.tests.filter((test) => test.passed).length;
@@ -1017,14 +424,6 @@ export default function Home() {
         }),
       });
     }).catch(() => undefined);
-  };
-
-  const clearRun = () => {
-    runToken.current += 1;
-    executionAbort.current?.abort();
-    executionAbort.current = null;
-    setExecutionPhase("");
-    setExecutionResult(null);
   };
 
   const resumeJourney = () => {
@@ -1079,28 +478,6 @@ export default function Home() {
     emitAnalytics("tutorial_completed", { topicId: undefined, worldNumber: undefined, required: undefined });
     setTutorialOpen(false);
     openQuest(activeQuests[0]);
-  };
-
-  const updateRuntimeReadiness = (track: RuntimeWorkerTrack, readiness: RuntimeReadiness) => {
-    setRuntimeReadiness((current) => ({ ...current, [track]: readiness }));
-  };
-
-  const warmExecutionRuntime = (track: Track["id"]) => {
-    if (track === "genai") return;
-    updateRuntimeReadiness(track, "preparing");
-    setExecutionPhase(track === "python"
-      ? "Downloading and compiling Python once for this browser tab…"
-      : "Downloading and compiling PostgreSQL once for this browser tab…");
-    void prepareLabRuntime(track, (progress: RuntimeProgress) => {
-      setExecutionPhase(progress.detail);
-      if (progress.phase === "ready") updateRuntimeReadiness(track, "ready");
-    }).then(() => {
-      updateRuntimeReadiness(track, "ready");
-      setExecutionPhase(track === "python" ? "Python runtime ready." : "PostgreSQL runtime ready.");
-    }).catch(() => {
-      updateRuntimeReadiness(track, "error");
-      setExecutionPhase("Runtime preparation paused. Run the lab to retry.");
-    });
   };
 
   const selectTrack = (track: Track) => {
@@ -1173,7 +550,7 @@ export default function Home() {
 
   const openQuest = (quest: Quest, startAtProject = false) => {
     if (!isUnlocked(quest)) return;
-    setDailyQuestSession(null);
+    clearDailyQuestSession();
     const destinationModule = activeTrack.id === "python"
       ? getPythonModule(activePythonPaceId, quest.id)
       : activeTrack.id === "genai"
@@ -1225,11 +602,7 @@ export default function Home() {
   };
 
   const runCode = async () => {
-    executionAbort.current?.abort();
-    const controller = new AbortController();
-    executionAbort.current = controller;
-    const currentRun = runToken.current + 1;
-    runToken.current = currentRun;
+    const { controller, token: currentRun } = startRun();
     if (!code.trim()) {
       setStatus("error");
       setTerminal("> Nothing to run\n! Add a solution in the editor first.");
@@ -1274,9 +647,8 @@ export default function Home() {
         tests: [],
       };
     }
-    if (currentRun !== runToken.current) return;
-    executionAbort.current = null;
-    setExecutionPhase("");
+    if (!isCurrentRun(currentRun)) return;
+    finishRun();
     if (activeTrack.id !== "genai") updateRuntimeReadiness(activeTrack.id, result.runtime === "controlled-local" ? "error" : "ready");
     setExecutionResult(result);
     saveSubmission(result, "attempt");
@@ -1302,15 +674,7 @@ export default function Home() {
     setTerminal("> " + runtimeName + " · " + result.durationMs + "ms\n✓ All checks passed. Submit your " + (isRequiredWorldProject ? "world project" : "practice solution") + " when ready.");
   };
 
-  const stopExecution = () => {
-    runToken.current += 1;
-    executionAbort.current?.abort();
-    executionAbort.current = null;
-    setExecutionPhase("");
-    if (activeTrack.id !== "genai") updateRuntimeReadiness(activeTrack.id, "idle");
-    setStatus("idle");
-    setTerminal("> Execution stopped by learner.\nEdit or reset the lab when you are ready.");
-  };
+  const stopExecution = () => stopRuntimeExecution(activeTrack.id);
 
   const activateWorldPower = () => {
     if (lessonStage !== "quiz" || worldPowerUsed || quizResult === "passed") return;
@@ -1496,7 +860,7 @@ export default function Home() {
 
   const openNextSection = () => {
     if (dailyQuestMode) {
-      setDailyQuestSession(null);
+      clearDailyQuestSession();
       setView("roadmap");
       return;
     }
@@ -1507,14 +871,14 @@ export default function Home() {
   return (
     <main className={`app-shell track-${activeTrack.id}`}>
       <header className="topbar">
-        <button className="brand" onClick={() => { setDailyQuestSession(null); setView("tracks"); }} aria-label="Open CodeCraft tracks">
+        <button className="brand" onClick={() => { clearDailyQuestSession(); setView("tracks"); }} aria-label="Open CodeCraft tracks">
           <span className="brand-cube" aria-hidden="true"><i /></span>
           <span>CODECRAFT</span>
         </button>
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={view === "tracks" ? "active" : ""} onClick={() => { setDailyQuestSession(null); setView("tracks"); }}>Tracks</button>
-          {isPacedTrack && <button className={view === "paces" ? "active" : ""} onClick={() => { setDailyQuestSession(null); setView("paces"); }}>Pace</button>}
-          <button className={view === "roadmap" ? "active" : ""} onClick={() => { setDailyQuestSession(null); setView(isPacedTrack && !hasChosenActivePace ? "paces" : "roadmap"); }}>Roadmap</button>
+          <button className={view === "tracks" ? "active" : ""} onClick={() => { clearDailyQuestSession(); setView("tracks"); }}>Tracks</button>
+          {isPacedTrack && <button className={view === "paces" ? "active" : ""} onClick={() => { clearDailyQuestSession(); setView("paces"); }}>Pace</button>}
+          <button className={view === "roadmap" ? "active" : ""} onClick={() => { clearDailyQuestSession(); setView(isPacedTrack && !hasChosenActivePace ? "paces" : "roadmap"); }}>Roadmap</button>
           <button className={view === "quest" && !dailyQuestMode ? "active" : ""} onClick={() => openQuest(activeQuest)}>Quest</button>
           <button className={dailyQuestMode ? "active daily-nav" : "daily-nav"} onClick={openDailyQuest}>Daily Quest</button>
         </nav>
@@ -1602,217 +966,65 @@ export default function Home() {
         </div>
       )}
 
-      {profileOpen && (
-        <div className="profile-backdrop">
-          <button className="profile-backdrop-dismiss" onClick={closeProfile} aria-label="Close profile" />
-          <section className="profile-panel" id="codecraft-profile" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-            <button className="profile-close" onClick={closeProfile} aria-label="Close profile">×</button>
-            <header className="profile-panel-hero">
-              <div className={`profile-panel-avatar ${activeAvatar.id}`} aria-hidden="true">{activeAvatar.glyph}<small>LV {level}</small></div>
-              <div>
-                <p>CODECRAFT PLAYER PROFILE</p>
-                <h2 id="profile-title">{profileDisplayName}</h2>
-                <span>{clerkSignedIn ? clerkEmail : "Local adventurer"}</span>
-              </div>
-              {clerkSignedIn && !editingName && <button className="edit-name-button" onClick={beginNameEdit}>Edit name</button>}
-            </header>
-
-            {editingName && clerkSignedIn && (
-              <form className="profile-name-form" onSubmit={saveProfileName}>
-                <label><span>First or player name</span><input value={firstNameDraft} onChange={(event) => setFirstNameDraft(event.target.value)} maxLength={60} autoComplete="given-name" /></label>
-                <label><span>Last name</span><input value={lastNameDraft} onChange={(event) => setLastNameDraft(event.target.value)} maxLength={60} autoComplete="family-name" /></label>
-                {nameError && <p role="alert">{nameError}</p>}
-                <div><button type="button" onClick={() => setEditingName(false)}>Cancel</button><button type="submit" disabled={nameSaveState === "saving"}>{nameSaveState === "saving" ? "Saving…" : "Save name"}</button></div>
-              </form>
-            )}
-
-            <div className="profile-stats-grid" aria-label="Player progress summary">
-              <article><small>LEVEL</small><strong>{level}</strong><span>{xpToNextLevel} XP to next</span></article>
-              <article><small>TOPICS</small><strong>{totalBadges}</strong><span>completed</span></article>
-              <article><small>PROJECTS</small><strong>{totalProjects}</strong><span>worlds restored</span></article>
-              <article><small>XP</small><strong>{progress.xp}</strong><span>signal earned</span></article>
-            </div>
-
-            <section className="profile-level-progress">
-              <div><p>LEVEL {level} PROGRESS</p><span>{levelProgress}/100 XP</span></div>
-              <div role="progressbar" aria-label={`Level ${level} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={levelProgress}><i style={{ width: `${levelProgress}%` }} /></div>
-            </section>
-
-            <section className="profile-track-summary">
-              <div className="profile-section-heading"><div><p>Badges by track</p><span>Every completed topic restores one signal badge.</span></div><strong>{totalBadges} TOTAL</strong></div>
-              <div className="profile-track-list">
-                {trackProfileStats.map((track) => (
-                  <article className={track.id} key={track.id}>
-                    <div className="profile-track-icon">{track.icon}</div>
-                    <div><strong>{track.label}</strong><span>{track.completed}/{track.total} badges · {track.projects} projects</span><div><i style={{ width: `${track.percent}%` }} /></div></div>
-                    <b>{track.percent}%</b>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="profile-loadout">
-              <div className="profile-section-heading"><div><p>Avatar loadout</p><span>Choose the explorer representing you in the Code Realms.</span></div><strong>{activeAvatar.name.toUpperCase()}</strong></div>
-              <div className="avatar-options">
-                {AVATARS.map((avatar) => {
-                  const unlocked = totalBadges >= avatar.unlockAt;
-                  return <button className={`${avatar.id} ${progress.game.avatarId === avatar.id ? "selected" : ""}`} key={avatar.id} disabled={!unlocked} onClick={() => chooseAvatar(avatar.id)}><span>{unlocked ? avatar.glyph : "▣"}</span><strong>{avatar.name}</strong><small>{unlocked ? avatar.description : `Unlock at ${avatar.unlockAt} badges`}</small></button>;
-                })}
-              </div>
-            </section>
-
-            <section className="profile-collection">
-              <div className="profile-section-heading"><div><p>Inventory & achievements</p><span>Artifacts come from learning, labs, daily missions, and boss projects.</span></div><strong>{progress.game.inventory.length} ITEMS</strong></div>
-              <div className="inventory-grid">
-                {progress.game.inventory.map((item, index) => <div key={item}><span>{["◇", "◆", "✦", "◈"][index % 4]}</span><strong>{item}</strong></div>)}
-              </div>
-              <div className="achievement-grid" aria-label={`${unlockedAchievements} of ${achievements.length} achievements unlocked`}>
-                {achievements.map((achievement) => <article className={achievement.unlocked ? "unlocked" : "locked"} key={achievement.id}><span>{achievement.unlocked ? achievement.icon : "?"}</span><div><strong>{achievement.name}</strong><small>{achievement.detail}</small></div></article>)}
-              </div>
-            </section>
-
-            <section className="profile-submissions">
-              <div className="profile-section-heading"><div><p>Saved submissions</p><span>Your latest cloud-saved lab attempts.</span></div>{savedSubmissions.length > 0 && <strong>{savedSubmissions.length} RECENT</strong>}</div>
-              {!clerkSignedIn ? (
-                <div className="profile-empty"><span>◇</span><p><strong>Sign in to save attempts</strong>Your local XP remains available, and future submissions will sync to your account.</p></div>
-              ) : submissionsState === "loading" ? (
-                <div className="profile-loading"><i /> Loading saved submissions…</div>
-              ) : submissionsState === "error" ? (
-                <div className="profile-empty"><span>!</span><p><strong>Submissions are temporarily unavailable</strong>Your current progress is still safe.</p></div>
-              ) : savedSubmissions.length === 0 ? (
-                <div className="profile-empty"><span>◇</span><p><strong>No saved submissions yet</strong>Run and submit an optional lab to create your first record.</p></div>
-              ) : (
-                <div className="submission-list">
-                  {savedSubmissions.slice(0, 8).map((submission) => (
-                    <article key={submission.submission_id}>
-                      <span className={submission.passed ? "passed" : "failed"}>{submission.passed ? "✓" : "!"}</span>
-                      <div><strong>{submission.topic}</strong><small>{submission.track.toUpperCase()} · {submission.pace.toUpperCase()} · {submission.stage === "submitted" ? "SUBMITTED" : "ATTEMPT"}</small></div>
-                      <div><b>{submission.score}%</b><time dateTime={new Date(submission.created_at).toISOString()}>{new Date(submission.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <footer className="profile-account-actions">
-              {clerkSignedIn ? (
-                <>
-                  <button onClick={() => { closeProfile(); clerk.openUserProfile(); }}>Manage Clerk account</button>
-                  <a href="/account/delete">Delete account</a>
-                  <button className="sign-out-button" onClick={() => { closeProfile(); void clerk.signOut({ redirectUrl: "/" }); }}>Sign out</button>
-                </>
-              ) : (
-                <SignInButton mode="modal"><button onClick={closeProfile}>Sign in to sync and edit name</button></SignInButton>
-              )}
-            </footer>
-            <div className="profile-policy-links"><a href="/privacy">Privacy</a><span>·</span><a href="/api/health">Service status</a>{clerkSignedIn && <><span>·</span><a href="/admin/analytics">Owner insights</a></>}</div>
-          </section>
-        </div>
-      )}
+      <ProfilePanel
+        open={profileOpen}
+        signedIn={Boolean(clerkSignedIn)}
+        email={clerkEmail}
+        displayName={profileDisplayName}
+        level={level}
+        xpToNextLevel={xpToNextLevel}
+        levelProgress={levelProgress}
+        totalBadges={totalBadges}
+        totalProjects={totalProjects}
+        progress={progress}
+        trackStats={trackProfileStats}
+        avatars={AVATARS}
+        activeAvatar={activeAvatar}
+        achievements={achievements}
+        unlockedAchievements={unlockedAchievements}
+        editingName={editingName}
+        firstNameDraft={firstNameDraft}
+        lastNameDraft={lastNameDraft}
+        nameSaveState={nameSaveState}
+        nameError={nameError}
+        savedSubmissions={savedSubmissions}
+        submissionsState={submissionsState}
+        onClose={closeProfile}
+        onBeginNameEdit={beginNameEdit}
+        onCancelNameEdit={cancelNameEdit}
+        onFirstNameChange={setFirstNameDraft}
+        onLastNameChange={setLastNameDraft}
+        onSaveName={saveProfileName}
+        onChooseAvatar={chooseAvatar}
+        onManageAccount={() => { closeProfile(); clerk.openUserProfile(); }}
+        onSignOut={() => { closeProfile(); void clerk.signOut({ redirectUrl: "/" }); }}
+      />
 
       {view === "tracks" ? (
-        <section className="track-picker">
-          <div className="track-picker-hero">
-            <p className="pixel-kicker">ORIGINAL CODE REALMS · CHOOSE YOUR MISSION</p>
-            <h1>Repair the Core Relay.<br /><span>Master real code.</span></h1>
-            <p>The Code Realms have fallen out of sync. Join Byte, restore their systems one concept at a time, and turn knowledge into power.</p>
-          </div>
-          {(journey.started || totalBadges > 0) && (
-            <section className="journey-resume">
-              <div><span>CONTINUE YOUR JOURNEY</span><h2>{journey.started ? `${savedTrack.label} / ${savedPace.label}` : "Return to your most active path"}</h2><p>Your next unlocked topic, world project, and rewards are waiting.</p></div>
-              <button onClick={resumeJourney}>Continue where I left off</button>
-            </section>
-          )}
-          <section className={`daily-quest-launch ${dailyQuestCompletedToday ? "complete" : ""}`} aria-labelledby="daily-quest-title">
-            <div className="daily-quest-emblem" aria-hidden="true">☼<span>{String(new Date().getUTCDate()).padStart(2, "0")}</span></div>
-            <div><p>DAILY QUEST · RESETS 00:00 UTC</p><h2 id="daily-quest-title">{dailyQuestPreview.title}</h2><span>{activeTrack.label} · {activePace.label} · 5–15 minute challenge</span></div>
-            <div className="daily-quest-reward"><small>TODAY&apos;S REWARD</small><strong>+{DAILY_QUEST_XP} XP</strong><span>{progress.game.dailyQuestStreak} day streak</span></div>
-            <button onClick={openDailyQuest}>{dailyQuestCompletedToday ? "Replay today's quest" : "Open daily quest"} →</button>
-          </section>
-          {totalBadges === 0 && <FirstRunChecklist activeStep={0} />}
-          <section className="track-recommender" aria-labelledby="track-recommender-title">
-            <div><p>NEED A RECOMMENDATION?</p><h2 id="track-recommender-title">What do you want to build?</h2></div>
-            <div>
-              <button className={goalRecommendation === "python" ? "active" : ""} onClick={() => setGoalRecommendation("python")}><strong>Programming foundations</strong><span>Software, automation, APIs</span></button>
-              <button className={goalRecommendation === "genai" ? "active" : ""} onClick={() => setGoalRecommendation("genai")}><strong>AI applications</strong><span>RAG, agents, evaluation</span></button>
-              <button className={goalRecommendation === "sql" ? "active" : ""} onClick={() => setGoalRecommendation("sql")}><strong>Data systems</strong><span>Analysis, databases, scale</span></button>
-            </div>
-          </section>
-          <div className="track-grid">
-            {TRACKS.map((track) => {
-              const trackPaces = track.id === "python" ? PYTHON_PACES : track.id === "genai" ? GENAI_PACES : SQL_PACES;
-              const total = trackPaces.reduce((sum, pace) => sum + pace.topics.length, 0);
-              const completed = trackPaces.reduce((sum, pace) => sum + (progress.completed[`${track.id}-${pace.id}`]?.length ?? 0), 0);
-              const percent = Math.round((completed / total) * 100);
-              return (
-                <article className={`track-card ${track.id} ${goalRecommendation === track.id ? "recommended" : ""}`} key={track.id}>
-                  <div className="track-art" aria-hidden="true"><span>{track.icon}</span><i /><i /></div>
-                  <div className="track-card-body">
-                    <div className={"recommendation-badge " + (goalRecommendation === track.id ? "" : "recommendation-placeholder")} aria-hidden={goalRecommendation !== track.id}>RECOMMENDED FOR YOUR GOAL</div>
-                    <p>{track.kicker}</p>
-                    <h2>{track.label}</h2>
-                    <strong>Beginner · Intermediate · Expert</strong>
-                    <span>{track.description}</span>
-                    <div className="track-fit"><small>BEST FIT</small><strong>{TRACK_MATCH[track.id]}</strong></div>
-                    <div className="realm-signature"><small>REALM MISSION</small><p>{track.mission}</p><b>◆ {track.energy}</b></div>
-                    <div className="track-skills">{track.outcome.split(" · ").map((skill) => <small key={skill}>{skill}</small>)}</div>
-                    <div className="track-card-progress"><div><i style={{ width: `${percent}%` }} /></div><span>{completed}/{total} topics</span></div>
-                    <button onClick={() => selectTrack(track)}>Choose your pace →</button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-          <div className="codecraft-lore" aria-label="CodeCraft universe">
-            <article><span>01</span><div><small>YOUR GUIDE</small><strong>Byte</strong><p>A relay guardian who turns your code into actions inside each realm.</p></div></article>
-            <article><span>02</span><div><small>YOUR POWER</small><strong>Signal shards</strong><p>Earned through understanding, checkpoints, and optional practice.</p></div></article>
-            <article><span>03</span><div><small>YOUR MISSION</small><strong>The Core Relay</strong><p>Reconnect every realm and return knowledge to the network.</p></div></article>
-          </div>
-          <div className="track-picker-note"><span>◆</span><p><strong>{cloudUser ? "Progress synced across devices" : "Progress stays with you"}</strong>{cloudUser ? `Signed in as ${cloudUser.displayName}. Local progress was merged safely with your cloud save.` : "Your XP, badges, and restored systems stay on this device. Sign in above to migrate and sync them."}</p></div>
-        </section>
+        <TrackPickerView
+          journey={journey}
+          totalBadges={totalBadges}
+          savedTrackLabel={savedTrack.label}
+          savedPaceLabel={savedPace.label}
+          dailyQuest={{ completed: dailyQuestCompletedToday, title: dailyQuestPreview.title, trackLabel: activeTrack.label, paceLabel: activePace.label, streak: progress.game.dailyQuestStreak, onOpen: openDailyQuest }}
+          progress={progress}
+          recommendation={goalRecommendation}
+          cloudUser={cloudUser}
+          onResume={resumeJourney}
+          onRecommend={setGoalRecommendation}
+          onSelectTrack={selectTrack}
+        />
       ) : view === "paces" ? (
-        <section className={`python-pace-picker ${activeTrack.id}-pace-picker`}>
-          <div className="pace-picker-hero">
-            <button onClick={() => setView("tracks")}>← All tracks</button>
-            <p className="pixel-kicker">{activeTrack.label.toUpperCase()} TRAIL · CHOOSE YOUR PATH</p>
-            <h1>Choose your<br /><span>{activeTrack.label} pace</span></h1>
-            <p>Start where you are. You can switch paths at any time, and progress is saved separately for every level.</p>
-          </div>
-          {totalBadges === 0 && <FirstRunChecklist activeStep={1} />}
-          <section className="pace-recommender" aria-labelledby="pace-recommender-title">
-            <div><p>PACE FINDER</p><h2 id="pace-recommender-title">How familiar are you with {activeTrack.label}?</h2></div>
-            <div>
-              {(Object.keys(PACE_MATCH) as PythonPaceId[]).map((paceId) => <button className={paceRecommendation === paceId ? "active" : ""} onClick={() => setPaceRecommendation(paceId)} key={paceId}><strong>{paceId}</strong><span>{PACE_MATCH[paceId]}</span></button>)}
-            </div>
-            <p>Recommended path: <strong>{paceRecommendation[0].toUpperCase() + paceRecommendation.slice(1)}</strong>. You can switch later without losing progress.</p>
-          </section>
-          <div className="pace-grid">
-            {activePaces.map((pace, index) => {
-              const completed = progress.completed[`${activeTrack.id}-${pace.id}`]?.length ?? 0;
-              const percent = Math.round((completed / pace.topics.length) * 100);
-              return (
-                <article className={`pace-card ${pace.id} ${paceRecommendation === pace.id ? "recommended" : ""}`} key={pace.id}>
-                  <div className="pace-card-art" aria-hidden="true"><span>{index + 1}</span><i /><i /><b>{pace.estimatedLevel}</b></div>
-                  <div className="pace-card-body">
-                    <div className={"recommendation-badge " + (paceRecommendation === pace.id ? "" : "recommendation-placeholder")} aria-hidden={paceRecommendation !== pace.id}>RECOMMENDED START</div>
-                    <div className="pace-tier"><span>PATH {String(index + 1).padStart(2, "0")}</span><small>{pace.topics.length} TOPICS</small></div>
-                    <h2>{pace.label}</h2>
-                    <strong>{pace.tagline}</strong>
-                    <p>{pace.description}</p>
-                    <div className="pace-for"><small>RECOMMENDED FOR</small><span>{pace.recommendedFor}</span></div>
-                    <div className="pace-topic-preview">
-                      {pace.topics.slice(0, 5).map((topic) => <span key={topic.title}>{topic.title}</span>)}
-                      <span>+{pace.topics.length - 5} more</span>
-                    </div>
-                    <div className="pace-card-progress"><div><i style={{ width: `${percent}%` }} /></div><span>{completed}/{pace.topics.length} complete</span></div>
-                    <button className="pace-card-cta" onClick={() => selectPace(pace.id)}>{completed ? `Continue ${pace.label}` : `Start ${pace.label}`} →</button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-          <div className="pace-picker-note"><span>◇</span><p><strong>Not sure where to begin?</strong>Start with Beginner. Completing one path is not required before exploring another.</p></div>
-        </section>
+        <PacePickerView
+          track={activeTrack}
+          paces={activePaces}
+          progress={progress}
+          totalBadges={totalBadges}
+          recommendation={paceRecommendation}
+          onBack={() => setView("tracks")}
+          onRecommend={setPaceRecommendation}
+          onSelect={selectPace}
+        />
       ) : view === "roadmap" ? (
         <section className="roadmap-page">
           <section className={`world-hero ${activeTrack.id} ${isPacedTrack ? activePaceId : ""}`}>
@@ -1836,51 +1048,26 @@ export default function Home() {
           </section>
           {totalBadges === 0 && <div className="roadmap-first-run"><FirstRunChecklist activeStep={2} /><p><strong>Your map is ready.</strong> Learn the game loop, then begin the first highlighted topic.</p></div>}
 
-          <section className="realm-command-center" aria-labelledby="realm-map-title">
-            <header className="realm-command-header">
-              <div><p className="pixel-kicker">LIVE REALM MAP · {activePace.label.toUpperCase()} PATH</p><h2 id="realm-map-title">Travel through the restored worlds</h2><span>Select any unlocked world. Your checkpoints and projects visibly energize its relay.</span></div>
-              <div className="game-hud"><article><small>STREAK</small><strong>{progress.game.streakDays} DAYS</strong></article><article><small>INVENTORY</small><strong>{progress.game.inventory.length} ITEMS</strong></article><article><small>ACHIEVEMENTS</small><strong>{unlockedAchievements}/{achievements.length}</strong></article></div>
-            </header>
-
-            <div className="byte-comm">
-              <span className="byte-comm-face">◆<small>BYTE</small></span>
-              <div><p>GUIDE TRANSMISSION {storyStep + 1}/{byteStory.length}</p><strong>{byteStory[storyStep % byteStory.length]}</strong></div>
-              <button onClick={() => { playGameSound("select"); setStoryStep((current) => (current + 1) % byteStory.length); }}>Next transmission →</button>
-            </div>
-
-            {mapWorld && (
-              <section className="world-contract" aria-label={mapWorld.name + " world contract"}>
-                <div className="world-contract-intro"><small>ACTIVE WORLD CONTRACT · {mapWorldContractProgress}%</small><h3>{mapWorld.name}: {mapWorldMechanic.event}</h3><p>{mapWorldMechanic.description}</p><div role="progressbar" aria-label="World contract progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={mapWorldContractProgress}><i style={{ width: mapWorldContractProgress + "%" }} /></div></div>
-                <ol>
-                  <li className={mapWorld.completed === mapWorld.size ? "done" : ""}><span>{mapWorld.completed === mapWorld.size ? "✓" : "1"}</span><p><strong>Repair knowledge nodes</strong>{mapWorld.completed}/{mapWorld.size} topic systems online</p></li>
-                  <li className={mapWorldSideMissions > 0 ? "done" : ""}><span>{mapWorldSideMissions > 0 ? "✓" : "2"}</span><p><strong>Recover a power cell</strong>{mapWorldSideMissions > 0 ? mapWorldSideMissions + " side mission completed" : "Complete one optional lab"}</p></li>
-                  <li className={mapWorld.projectComplete ? "done" : ""}><span>{mapWorld.projectComplete ? "✓" : "3"}</span><p><strong>Defeat the guardian</strong>{mapWorld.projectComplete ? "World relic recovered" : "Complete the required project"}</p></li>
-                </ol>
-              </section>
-            )}
-
-            <div className="realm-map" style={{ "--world-count": activeWorlds.length } as CSSProperties}>
-              <div className="realm-route" aria-hidden="true"><i style={{ width: `${activeWorlds.length > 1 ? (currentWorldIndex / (activeWorlds.length - 1)) * 100 : 100}%` }} /></div>
-              {activeWorlds.map((world, index) => {
-                const percent = Math.round((world.completed / world.size) * 100);
-                const restored = world.completed === world.size && world.projectComplete;
-                const bossReady = world.completed === world.size && !world.projectComplete;
-                const mechanic = getWorldMechanic(activeTrack.id, world.number);
-                return (
-                  <button className={`realm-world-node ${restored ? "restored" : bossReady ? "boss-ready" : world.unlocked ? "active" : "locked"} ${index === currentWorldIndex ? "player-here" : ""}`} key={world.name} onClick={() => enterWorld(world)} disabled={!world.unlocked}>
-                    {index === currentWorldIndex && <span className={`map-player ${activeAvatar.id}`}>{activeAvatar.glyph}<small>YOU</small></span>}
-                    <span className="world-event-tag">{mechanic.event}</span>
-                    <span className="realm-world-art" aria-hidden="true"><i /><i /><b>{restored ? "✓" : bossReady ? "!" : world.unlocked ? world.number : "▣"}</b></span>
-                    <small>WORLD {String(world.number).padStart(2, "0")}</small>
-                    <strong>{world.name}</strong>
-                    <p>{restored ? "Relay fully restored" : bossReady ? "Boss project ready" : world.unlocked ? `${world.completed}/${world.size} systems repaired` : "Locked by previous boss"}</p>
-                    <div><i style={{ width: `${restored ? 100 : percent}%` }} /></div>
-                    <em>{restored ? "EXPLORE" : bossReady ? "ENTER BOSS" : world.unlocked ? "TRAVEL" : "LOCKED"}</em>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+          <WorldMap
+            paceLabel={activePace.label}
+            streakDays={progress.game.streakDays}
+            inventoryCount={progress.game.inventory.length}
+            unlockedAchievements={unlockedAchievements}
+            achievementCount={achievements.length}
+            storyStep={storyStep}
+            byteStory={byteStory}
+            world={mapWorld}
+            worldContractProgress={mapWorldContractProgress}
+            worldEvent={mapWorldMechanic.event}
+            worldDescription={mapWorldMechanic.description}
+            worldSideMissions={mapWorldSideMissions}
+            worlds={activeWorlds}
+            currentWorldIndex={currentWorldIndex}
+            activeAvatar={activeAvatar}
+            getWorldEvent={(worldNumber) => getWorldMechanic(activeTrack.id, worldNumber).event}
+            onNextTransmission={() => { playGameSound("select"); setStoryStep((current) => (current + 1) % byteStory.length); }}
+            onEnterWorld={enterWorld}
+          />
 
           <div className="roadmap-layout">
             <section className="trail-panel">
@@ -1958,7 +1145,7 @@ export default function Home() {
       ) : (
         <section className="lesson-page">
           <div className="lesson-bar">
-            <button onClick={() => { if (dailyQuestMode) setDailyQuestSession(null); setView("roadmap"); }}>{dailyQuestMode ? "← Close daily quest" : "← Roadmap"}</button>
+            <button onClick={() => { if (dailyQuestMode) clearDailyQuestSession(); setView("roadmap"); }}>{dailyQuestMode ? "← Close daily quest" : "← Roadmap"}</button>
             <div><span>{dailyQuestMode ? `DAILY QUEST / ${activeTrack.label.toUpperCase()} / ${activePace.label.toUpperCase()}` : `${activeTrack.label.toUpperCase()} / ${isPacedTrack ? `${activePace.label.toUpperCase()} / ` : ""}${activeQuest.chapter.toUpperCase()}`}</span><strong>{activeQuest.title}</strong></div>
             <div className="lesson-progress"><i style={{ width: dailyQuestMode ? dailyQuestCompletedToday ? "100%" : "50%" : `${((activeQuest.id - 1) / activeQuests.length) * 100}%` }} /></div>
             <span>{dailyQuestMode ? "UTC" : `${activeQuest.id} / ${activeQuests.length}`}</span>
@@ -1996,162 +1183,64 @@ export default function Home() {
           )}
 
           {lessonStage === "theory" ? (
-            <section className="learning-screen">
-              <div className="learning-main">
-                <p className="pixel-kicker">STEP 1 · LEARN THE IDEA</p>
-                <h1>{activeQuest.concept}</h1>
-                <p className="learning-lead">{activeTheory.overview}</p>
-                <div className="theory-foundation">
-                  <span>CORE EXPLANATION</span>
-                  <p>{activeTheory.deeper}</p>
-                {activeLessonEnrichment && <div className="theory-foundation lesson-impact">
-                  <span>WHY THIS MATTERS</span>
-                  <p>{activeLessonEnrichment.whyItMatters}</p>
-                </div>}
-                </div>
-                <div className="theory-heading"><span>KNOWLEDGE BLOCKS</span><h2>Build the concept piece by piece</h2></div>
-                <div className="theory-grid rich">
-                  {activeTheory.keyIdeas.map((idea, index) => <article key={idea.title}><span>0{index + 1}</span><div><h2>{idea.title}</h2><p>{idea.body}</p></div></article>)}
-                </div>
-                <div className="theory-insights">
-                  <article className="mental-model"><span>◇ MENTAL MODEL</span><h2>Picture it this way</h2><p>{activeTheory.mentalModel}</p></article>
-                  <article className="mistake-note"><span>! COMMON MISTAKE</span><h2>Watch out for this</h2><p>{activeTheory.commonMistake}</p></article>
-                </div>
-                <div className="theory-checklist">
-                  <div><span>✓</span><div><small>QUICK SELF-CHECK</small><h2>Before you continue, ask yourself:</h2></div></div>
-                  <ul>{activeTheory.checkYourself.map((item) => <li key={item}>{item}</li>)}</ul>
-                </div>
-                <button className="curriculum-next" onClick={() => setLessonStage("example")}>See an explained example →</button>
-              </div>
-              <aside className="learning-aside"><div className="lesson-orb">{activeTrack.icon}</div><p>SECTION GOAL</p><strong>{activeQuest.objective}</strong><span>Learn the idea, study an example, then prove your understanding.</span><div className="aside-route"><small>YOUR ROUTE</small><b>Learn</b><i /> <b>Example</b><i /> <b>Quiz</b><i /> <b>{isRequiredWorldProject ? "Project" : activeGenAILab ? "AI lab" : "Optional code"}</b></div></aside>
-            </section>
+            <TheoryLessonView
+              quest={activeQuest}
+              theory={activeTheory}
+              enrichment={activeLessonEnrichment ?? null}
+              trackIcon={activeTrack.icon}
+              requiredProject={isRequiredWorldProject}
+              genAILab={Boolean(activeGenAILab)}
+              onContinue={() => setLessonStage("example")}
+            />
           ) : lessonStage === "example" ? (
-            <section className="learning-screen example-screen">
-              <div className="learning-main">
-                <p className="pixel-kicker">STEP 2 · EXAMPLE WALKTHROUGH</p>
-                <h1>See {activeQuest.concept} in action</h1>
-                <p className="learning-lead">Here is a complete, read-only example. Follow the idea line by line, then take the knowledge checkpoint.</p>
-                <div className="example-code"><div><span>EXAMPLE.{activeTrack.id === "sql" ? "SQL" : "PY"}</span><small>READ ONLY</small></div><pre>{activeQuest.starterCode}</pre></div>
-                <div className="walkthrough-list">
-                  {(activeLessonEnrichment?.walkthrough ?? [
-                    { title: "Set up the instruction", body: "The first meaningful line introduces the data, command, or query the program needs." },
-                    { title: "Apply the concept", body: `The program uses ${activeQuest.concept.toLowerCase()} to perform the section's main job.` },
-                    { title: "Check the result", body: `A correct run should: ${activeQuest.objective.toLowerCase()}.` },
-                  ]).map((step, index) => <article key={step.title}><b>{index + 1}</b><p><strong>{step.title}</strong>{step.body}</p></article>)}
-                </div>
-                <div className="curriculum-actions"><button onClick={() => setLessonStage("theory")}>← Review theory</button><button className="curriculum-next" onClick={() => { setQuizAnswers({}); setQuizResult("idle"); setLessonStage("quiz"); }}>Take the checkpoint →</button></div>
-              </div>
-              <aside className="learning-aside example-aside"><p>FIELD NOTE</p><strong>Examples are maps, not answers to memorize.</strong><span>Notice the structure and explain what each part contributes. Coding practice is optional after the quiz.</span></aside>
-            </section>
+            <ExampleLessonView
+              quest={activeQuest}
+              enrichment={activeLessonEnrichment ?? null}
+              trackId={activeTrack.id}
+              onReview={() => setLessonStage("theory")}
+              onCheckpoint={() => { setQuizAnswers({}); setQuizResult("idle"); setLessonStage("quiz"); }}
+            />
           ) : lessonStage === "quiz" ? (
-            <section className="quiz-screen">
-              <div className="quiz-heading"><p className="pixel-kicker">STEP 3 · REQUIRED CHECKPOINT</p><h1>Prove what you learned</h1><span>{isRequiredWorldProject ? `Answer all ${activeQuiz.length} questions correctly, then complete the applied project to stabilize this world.` : `Answer all ${activeQuiz.length} questions correctly to unlock the next section. No coding is required.`}</span></div>
-              {worldPowerHint && <div className="world-power-result" role="status"><span>◆</span><p><strong>{activeWorldMechanic.power} report</strong>{worldPowerHint}</p></div>}
-              <div className="quiz-list">
-                {activeQuiz.map((question, questionIndex) => (
-                  <fieldset key={question.question}><legend><span>{questionIndex + 1}</span>{question.question}</legend>
-                    {question.options.map((option, optionIndex) => <label className={(quizAnswers[questionIndex] === optionIndex ? "selected " : "") + ((eliminatedQuizOptions[questionIndex] ?? []).includes(optionIndex) ? "eliminated" : "")} key={option}><input disabled={(eliminatedQuizOptions[questionIndex] ?? []).includes(optionIndex)} type="radio" name={`question-${questionIndex}`} checked={quizAnswers[questionIndex] === optionIndex} onChange={() => { setQuizAnswers((current) => ({ ...current, [questionIndex]: optionIndex })); setQuizResult("idle"); }} /><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></label>)}
-                    {quizResult !== "idle" && quizAnswers[questionIndex] !== undefined && <p className={quizAnswers[questionIndex] === question.answer ? "correct" : "incorrect"}>{quizAnswers[questionIndex] === question.answer ? `✓ Correct — ${question.explanation}` : `✕ ${question.explanation}`}</p>}
-                  </fieldset>
-                ))}
-              </div>
-              <div className={`quiz-result ${quizResult}`}><p>{quizResult === "passed" ? isRequiredWorldProject ? `Checkpoint passed! The ${activeQuest.badge} badge is yours. Finish the world project to continue.` : `Checkpoint passed! +${activeQuest.xp} signal XP and the ${activeQuest.badge} badge are yours.` : quizResult === "failed" ? "Some answers need another look. Review the explanations and try again." : quizResult === "incomplete" ? "Answer every question before submitting." : isRequiredWorldProject ? "A required applied project follows this checkpoint." : "The optional practice lab appears after you stabilize this system."}</p>
-                {quizResult === "passed" ? isRequiredWorldProject ? <div><button className="curriculum-next" onClick={openBonus}>Start required world project →</button></div> : <div><button onClick={openBonus}>{activeGenAILab ? "Try optional AI lab +20 XP" : "Try optional coding +20 XP"}</button><button className="curriculum-next" onClick={openNextSection}>Skip bonus · Next section →</button></div> : <button className="curriculum-next" onClick={submitQuiz}>Check answers</button>}
-              </div>
-            </section>
+            <QuizLessonView
+              quest={activeQuest}
+              questions={activeQuiz}
+              answers={quizAnswers}
+              result={quizResult}
+              eliminatedOptions={eliminatedQuizOptions}
+              worldPowerHint={worldPowerHint}
+              worldPowerName={activeWorldMechanic.power}
+              requiredProject={isRequiredWorldProject}
+              genAILab={Boolean(activeGenAILab)}
+              onAnswer={(questionIndex, optionIndex) => { setQuizAnswers((current) => ({ ...current, [questionIndex]: optionIndex })); setQuizResult("idle"); }}
+              onOpenBonus={openBonus}
+              onNext={openNextSection}
+              onSubmit={submitQuiz}
+            />
           ) : (
-          <div className="lesson-workspace">
-            <section className="lesson-content">
-              <div className="lesson-copy">
-                <p className="pixel-kicker">{dailyQuestMode ? "DAILY QUEST · ONE REWARD PER DAY" : isRequiredWorldProject ? "WORLD BOSS · REQUIRED PROJECT" : "OPTIONAL SIDE MISSION"} · +{bonusXp} XP</p>
-                <h1>{activeGenAILab?.title ?? activeChallenge?.title ?? "Optional coding challenge"}</h1>
-                <p>{activeGenAILab?.brief ?? activeChallenge?.instructions ?? `Rebuild the ${activeQuest.concept} solution from a blank editor. This practice does not block your progress to the next section.`}</p>
-                <div className="objective-card"><span>◆</span><div><small>{dailyQuestMode ? "TODAY'S OBJECTIVE" : "YOUR OBJECTIVE"}</small><strong>{activeQuest.objective}</strong></div></div>
-                <div className="guide-card"><span>?</span><p><strong>Field guide</strong>{activeQuest.guide}</p></div>
-                {activeGenAILab && (
-                  <div className={`genai-lab-kit ${activeGenAILab.required ? "required-project" : ""}`}>
-                    <div className="genai-lab-meta"><span>{activeGenAILab.labType}</span><b>CONTROLLED AI LAB</b><small>NO PERSONAL API KEY · NO CREDITS</small></div>
-                    <div className="genai-lab-resources">
-                      <article><strong>SUPPLIED DATA</strong><div className="genai-lab-chips">{activeGenAILab.dataFiles.map((file) => <span key={file}>{file}</span>)}</div></article>
-                      <article><strong>LAB TOOLS</strong><div className="genai-lab-chips">{activeGenAILab.tools.map((tool) => <span key={tool}>{tool}</span>)}</div></article>
-                    </div>
-                    <div className="genai-lab-criteria"><strong>SUCCESS CRITERIA</strong><ul>{activeGenAILab.successCriteria.map((criterion) => <li key={criterion}>✓ {criterion}</li>)}</ul></div>
-                  </div>
-                )}
-                {activeChallenge && (
-                  <div className="challenge-kit">
-                    {activeChallenge.dataPreview && <div className="challenge-data"><strong>PRACTICE DATABASE</strong><div>{activeChallenge.dataPreview.map((item) => <span key={item}>{item}</span>)}</div></div>}
-                    <div className="visible-examples">
-                      {activeChallenge.visibleExamples.map((example) => <article key={example.label + example.input}><strong>{example.label}</strong><p><small>INPUT</small><code>{example.input}</code></p><p><small>EXPECTED</small><code>{example.output}</code></p></article>)}
-                    </div>
-                    <div className="hidden-check-note"><span>◈</span><p><strong>{(activeChallenge.runtime.pythonTests?.length ?? activeChallenge.runtime.sqlTests?.length ?? 0) + activeChallenge.runtime.requiredPatterns.length} HIDDEN CHECKS</strong>Run the solution to receive precise pass/fail feedback and targeted hints.</p></div>
-                  </div>
-                )}
-              </div>
-
-              <div className={`simulator scene-${activeQuest.scene} ${status}`} aria-label={`${activeQuest.title} CodeCraft realm simulation`}>
-                <div className="sim-sky"><i /><i /></div>
-                <div className="sim-status"><span>{status === "error" ? "!" : status === "complete" ? "✓" : status === "ready" ? "◆" : status === "running" ? "▶" : "○"}</span>{status === "running" ? "Byte is syncing your code…" : status === "ready" ? "Relay objective reached — submit it!" : status === "complete" ? "System restored!" : status === "error" ? "Check the terminal for a hint." : "Run your code to energize the realm."}</div>
-                <div className="sim-stage">
-                  <div className="ground left-ground" /><div className="ground right-ground" />
-                  <div className="target">{activeQuest.scene === "vault" ? "✦" : activeQuest.scene === "supplies" ? "▤" : "◆"}</div>
-                  <div className="path-blocks">
-                    {Array.from({ length: activeQuest.steps }).map((_, index) => <i className={sceneStep > index ? "active" : ""} key={index} />)}
-                  </div>
-                  <span className={`byte step-${sceneStep}`}>▣<b>BYTE</b></span>
-                </div>
-                <div className="sim-footer">LIVE CODE-REALM SIMULATION · CORE RELAY LINK</div>
-              </div>
-            </section>
-
-            <section className="coding-station">
-              <div className="editor-topbar">
-                <div><span className="file-dot">◆</span><strong>{activeGenAILab?.fileName ?? (activeTrack.id === "sql" ? "query.sql" : "main.py")}</strong></div>
-                <button onClick={openBonus}>↺ {activeTrack.id === "sql" ? "Reset database & code" : activeTrack.id === "python" ? "Reset code" : "Reset lab"}</button>
-              </div>
-              <div className="snippet-tray bonus-tray">{activeGenAILab ? "CONTROLLED AI RUNTIME · deterministic checks unlimited · 3 signed-in AI coaching reviews daily" : activeTrack.id === "sql" ? "REAL POSTGRESQL · warmed worker, fresh seeded database on every run" : "REAL PYTHON · warmed isolated browser worker with clean state per run"}</div>
-              {activeTrack.id !== "genai" && status !== "running" && runtimeReadiness[activeTrack.id] !== "idle" && (
-                <div className={`runtime-loader runtime-${runtimeReadiness[activeTrack.id]}`} role="status" aria-live="polite">
-                  <i />
-                  <span><strong>{runtimeReadiness[activeTrack.id] === "ready" ? "RUNTIME READY" : runtimeReadiness[activeTrack.id] === "error" ? "PRELOAD PAUSED" : activeTrack.id === "python" ? "PREPARING PYTHON" : "PREPARING DATABASE"}</strong>{executionPhase}</span>
-                </div>
-              )}
-              {status === "running" && <div className="runtime-loader" role="status" aria-live="polite"><i /><span><strong>{activeTrack.id === "python" ? "PREPARING PYTHON" : activeTrack.id === "sql" ? "PREPARING DATABASE" : "EVALUATING LAB"}</strong>{executionPhase}</span></div>}
-              <div className={`code-window ${status === "error" ? "has-error" : ""}`}>
-                <div className="line-numbers" aria-hidden="true">{code.split("\n").map((_, index) => <span key={index}>{index + 1}</span>)}</div>
-                <textarea
-                  value={code}
-                  onChange={(event) => { setCode(event.target.value); setStatus("idle"); setExecutionResult(null); setTerminal(activeGenAILab ? "Lab changed. Run it through the controlled AI evaluator." : "Code changed. Run it to see what happens."); }}
-                  onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") runCode(); }}
-                  aria-label={`${activeQuest.title} code editor`}
-                  spellCheck={false}
-                />
-              </div>
-              <div className="editor-actions">
-                <span>Ctrl + Enter to run</span>
-                {status === "running" ? <button className="stop-execution" onClick={stopExecution}>■ Stop execution</button> : <button className="run-secondary" onClick={runCode}>▶ {activeGenAILab ? "Evaluate lab" : activeTrack.id === "sql" ? "Run SQL" : "Run Python"}</button>}
-                <button className="submit-primary" onClick={submitBonus} disabled={status !== "ready" && status !== "complete"}>{dailyQuestMode ? dailyQuestCompletedToday ? "Daily reward claimed" : "Claim daily reward" : `Submit ${isRequiredWorldProject ? "boss project" : activeGenAILab ? "practice lab" : "optional challenge"}`}</button>
-              </div>
-              <div className={`terminal ${status}`}>
-                <div><span>{activeGenAILab ? "CONTROLLED AI EVALUATOR" : activeTrack.id === "sql" ? "POSTGRESQL OUTPUT" : "PYTHON OUTPUT"}</span><i>{status === "running" ? "RUNNING" : status.toUpperCase()}</i></div>
-                <pre>{terminal}</pre>
-                {executionResult && (
-                  <div className="execution-details">
-                    <section className="execution-output"><h3>OUTPUT <small>{executionResult.durationMs}ms</small></h3><pre>{executionResult.stdout || "No stdout was produced."}</pre></section>
-                    {executionResult.table && <section className="result-table-panel"><h3>RESULT TABLE <small>{executionResult.table.rows.length} rows</small></h3><div><table><thead><tr>{executionResult.table.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{executionResult.table.rows.map((row, rowIndex) => <tr key={rowIndex}>{executionResult.table!.columns.map((column) => <td key={column}>{row[column] === null || row[column] === undefined ? <i>NULL</i> : String(row[column])}</td>)}</tr>)}</tbody></table></div></section>}
-                    <section className="test-results"><h3>{activeGenAILab ? "EVALUATION RUBRIC" : "TEST RESULTS"} <small>{executionResult.tests.filter((test) => test.passed).length}/{executionResult.tests.length} passed</small></h3><div>{executionResult.tests.map((test) => <article className={test.passed ? "passed" : "failed"} key={test.name}><span>{test.passed ? "✓" : "!"}</span><p><strong>{test.name}</strong>{test.detail}{!test.passed && test.hint && <small>Hint: {test.hint}</small>}</p></article>)}</div></section>
-                    {executionResult.error && <section className="execution-error"><h3>ERROR</h3><pre>{executionResult.error}</pre></section>}
-                  </div>
-                )}
-              </div>
-              {status === "complete" && (
-                <div className="quest-complete-banner">
-                  <div><span>✦</span><p><small>{dailyQuestMode ? "DAILY QUEST COMPLETE" : isRequiredWorldProject ? "WORLD BOSS DEFEATED" : "SIDE MISSION COMPLETE"}</small><strong>+{bonusXp} {dailyQuestMode ? "daily" : isRequiredWorldProject ? "project" : "bonus"} XP</strong></p></div>
-                  <button onClick={openNextSection}>{dailyQuestMode ? "Return to roadmap" : isRequiredWorldProject ? isFinalQuest ? "Finish path" : "Enter next world" : "Next section"} →</button>
-                </div>
-              )}
-            </section>
-          </div>
+            <LabWorkspaceView
+              quest={activeQuest}
+              trackId={activeTrack.id}
+              genAILab={activeGenAILab}
+              challenge={activeChallenge}
+              dailyQuestMode={dailyQuestMode}
+              dailyQuestCompleted={dailyQuestCompletedToday}
+              requiredProject={isRequiredWorldProject}
+              finalQuest={isFinalQuest}
+              bonusXp={bonusXp}
+              code={code}
+              status={status}
+              terminal={terminal}
+              sceneStep={sceneStep}
+              executionResult={executionResult}
+              executionPhase={executionPhase}
+              runtimeReadiness={runtimeReadiness}
+              onReset={openBonus}
+              onCodeChange={(value) => { setCode(value); setStatus("idle"); setExecutionResult(null); setTerminal(activeGenAILab ? "Lab changed. Run it through the controlled AI evaluator." : "Code changed. Run it to see what happens."); }}
+              onRun={runCode}
+              onStop={stopExecution}
+              onSubmit={submitBonus}
+              onNext={openNextSection}
+            />
           )}
         </section>
       )}

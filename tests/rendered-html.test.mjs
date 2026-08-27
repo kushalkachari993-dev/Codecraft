@@ -81,7 +81,20 @@ test("renders the privacy notice", async () => {
 
 test("keeps the finished product free of starter-preview code", async () => {
   const [page, layout, packageJson, pythonCurriculum, genaiCurriculum, sqlCurriculum, challenges, executionClient, pythonRunner, sqlRunner, worker, serverConfig, workersAiAdapter, progressSource, progressRoute, d1Repository, submissionsRoute, schema, clerkAuth, clerkProvider, accountRoute, healthRoute, privacyPage, deleteAccountPage, migration, workerUrlNormalizer] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    Promise.all([
+      readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/codecraft-catalog.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/components/journey-views.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/components/profile-panel.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/components/world-map.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/components/lesson-stage-views.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/components/daily-quest-card.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/hooks/use-journey.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/hooks/use-progress-sync.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/hooks/use-profile.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/hooks/use-lab-runtime.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/hooks/use-daily-quest.ts", import.meta.url), "utf8"),
+    ]).then((parts) => parts.join("\n")),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../app/python-curriculum.ts", import.meta.url), "utf8"),
@@ -120,7 +133,7 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.match(page, /progress\.bonus/);
   assert.doesNotMatch(page, /const (?:PYTHON|GENAI|SQL)_QUESTS: Quest\[\]/);
   assert.match(page, /The Function Relay/);
-  assert.match(page, /\{activeTrack\.label\} pace/);
+  assert.match(page, /\{track\.label\} pace/);
   assert.match(page, /activeTrack\.id === "sql" \? SQL_PACES/);
   assert.match(progressSource, /python-beginner/);
   assert.match(progressSource, /python-intermediate/);

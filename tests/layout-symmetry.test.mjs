@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = await readFile(new URL("../app/components/journey-views.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
 test("track and pace recommendations reserve equal card space", () => {
-  assert.match(page, /goalRecommendation === track\.id \? "" : "recommendation-placeholder"/);
-  assert.match(page, /paceRecommendation === pace\.id \? "" : "recommendation-placeholder"/);
+  assert.match(page, /recommendation === track\.id \? "" : "recommendation-placeholder"/);
+  assert.match(page, /recommendation === pace\.id \? "" : "recommendation-placeholder"/);
   assert.match(css, /\.recommendation-placeholder \{ visibility: hidden; \}/);
 });
 

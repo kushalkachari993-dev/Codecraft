@@ -2,7 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const page = (await Promise.all([
+  readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/codecraft-catalog.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/components/world-map.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/components/lesson-stage-views.tsx", import.meta.url), "utf8"),
+])).join("\n");
 const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const progress = await readFile(new URL("../app/progress.ts", import.meta.url), "utf8");
 
@@ -34,7 +39,7 @@ test("daily world power claims survive local and cloud progress normalization", 
 });
 
 test("world mechanics remain responsive and eliminated decoys are accessible", () => {
-  assert.match(page, /disabled=\{\(eliminatedQuizOptions/);
+  assert.match(page, /disabled=\{\(eliminatedOptions/);
   assert.match(css, /label\.eliminated/);
   assert.match(css, /@media \(max-width: 680px\)[\s\S]*\.world-mechanic-banner/);
 });

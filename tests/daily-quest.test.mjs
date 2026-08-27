@@ -42,7 +42,10 @@ test("daily rewards are one per day, extend streaks, and sync with progress", as
 });
 
 test("daily quest launch and challenge briefing are responsive", async () => {
-  const [page, css] = await Promise.all([read("app/page.tsx"), read("app/globals.css")]);
+  const [page, css] = await Promise.all([
+    Promise.all([read("app/page.tsx"), read("app/components/daily-quest-card.tsx"), read("app/components/lesson-stage-views.tsx")]).then((parts) => parts.join("\n")),
+    read("app/globals.css"),
+  ]);
   assert.match(page, /daily-quest-launch/);
   assert.match(page, /daily-quest-brief/);
   assert.match(page, /Claim daily reward/);
