@@ -361,6 +361,30 @@ test("keeps the finished product free of starter-preview code", async () => {
   assert.doesNotMatch(page, /SkeletonPreview|codex-preview/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await assert.rejects(access(new URL("../app/chatgpt-auth.ts", import.meta.url)));
-  await access(new URL("../public/pyodide/pyodide.asm.wasm", import.meta.url));
-  await access(new URL("../public/pyodide/python_stdlib.zip", import.meta.url));
+  await access(new URL("../public/pyodide-314.0.5/pyodide.asm.wasm", import.meta.url));
+  await access(new URL("../public/pyodide-314.0.5/python_stdlib.zip", import.meta.url));
+});
+
+test("prewarms and durably caches the versioned Python runtime", async () => {
+  const [page, runtimeHook, runtimeCache, executionClient, pythonWorker, publicWorker, serviceWorker, headers] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/hooks/use-lab-runtime.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/execution/runtime-cache.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/execution/client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/execution/python-runner.worker.ts", import.meta.url), "utf8"),
+    readFile(new URL("../public/python-runner.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/runtime-cache-worker.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/_headers", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /routeReady && \(view === "roadmap" \|\| view === "quest"\)/);
+  assert.match(runtimeHook, /requestIdleCallback/);
+  assert.match(runtimeCache, /saveData/);
+  assert.match(runtimeCache, /slow-2g/);
+  assert.match(executionClient, /codecraft:runtime-metric/);
+  assert.match(pythonWorker, /\/pyodide-314\.0\.5\//);
+  assert.match(publicWorker, /\/pyodide-314\.0\.5\//);
+  assert.match(serviceWorker, /caches\.open\(CACHE_NAME\)/);
+  assert.match(serviceWorker, /cache\.match\(event\.request\)/);
+  assert.match(headers, /max-age=31536000, immutable/);
 });

@@ -3,6 +3,7 @@
  */
 
 let runtimePromise = null;
+const PYODIDE_INDEX_URL = "/pyodide-314.0.5/";
 
 function report(id, phase, detail) {
   self.postMessage({ type: "progress", id, phase, detail });
@@ -11,8 +12,8 @@ function report(id, phase, detail) {
 function getRuntime(id) {
   if (!runtimePromise) {
     report(id, "download", "Downloading Python runtime files (about 14 MB)...");
-    runtimePromise = import("/pyodide/pyodide.mjs")
-      .then(({ loadPyodide }) => loadPyodide({ indexURL: "/pyodide/" }))
+    runtimePromise = import(`${PYODIDE_INDEX_URL}pyodide.mjs`)
+      .then(({ loadPyodide }) => loadPyodide({ indexURL: PYODIDE_INDEX_URL }))
       .catch((error) => {
         runtimePromise = null;
         throw error;

@@ -15,6 +15,15 @@ const runtimePools: Record<RuntimeWorkerTrack, RuntimePool> = {
   sql: { worker: null, ready: false, preparing: null },
 };
 
+function recordRuntimePreparation(track: RuntimeWorkerTrack, startedAt: number, status: "ready" | "error") {
+  const durationMs = Math.round(performance.now() - startedAt);
+  const measureName = `codecraft:${track}:runtime-preparation`;
+  performance.measure(measureName, { start: startedAt, duration: durationMs });
+  window.dispatchEvent(new CustomEvent("codecraft:runtime-metric", {
+    detail: { track, status, durationMs, measureName },
+  }));
+}
+
 function createRuntimeWorker(track: RuntimeWorkerTrack) {
   // Keep Python on a stable same-origin URL while using the module-worker form
   // required by the hosted browser environment (and by its dynamic import).
@@ -142,6 +151,9 @@ export function prepareLabRuntime(
   }
   if (pool.preparing) return pool.preparing;
 
+  const startedAt = performance.now();
+  let preparationStatus: "ready" | "error" = "error";
+
   let preparation: Promise<ExecutionResult | null>;
   try {
     preparation = sendWorkerRequest(track, { type: "prepare" }, COLD_START_TIMEOUT[track], onProgress, signal);
@@ -154,9 +166,11 @@ export function prepareLabRuntime(
     .then((failure) => {
       if (failure) throw new Error(failure.error ?? "Runtime preparation failed.");
       pool.ready = true;
+      preparationStatus = "ready";
     })
     .finally(() => {
       pool.preparing = null;
+      recordRuntimePreparation(track, startedAt, preparationStatus);
     });
   return pool.preparing;
 }

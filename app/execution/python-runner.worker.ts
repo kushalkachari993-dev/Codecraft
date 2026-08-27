@@ -6,6 +6,7 @@ import type { WorkerExecutionRequest, WorkerExecutionResponse } from "./types";
 declare const self: DedicatedWorkerGlobalScope;
 
 let runtimePromise: Promise<PyodideInterface> | null = null;
+const PYODIDE_INDEX_URL = "/pyodide-314.0.5/";
 
 function report(id: number, phase: "download" | "initialize" | "execute" | "test" | "ready", detail: string) {
   self.postMessage({ type: "progress", id, phase, detail } satisfies WorkerExecutionResponse);
@@ -14,7 +15,7 @@ function report(id: number, phase: "download" | "initialize" | "execute" | "test
 function getRuntime(id: number) {
   if (!runtimePromise) {
     report(id, "download", "Downloading Python runtime files (about 14 MB)…");
-    runtimePromise = loadPyodide({ indexURL: "/pyodide/" }).catch((error) => {
+    runtimePromise = loadPyodide({ indexURL: PYODIDE_INDEX_URL }).catch((error) => {
       runtimePromise = null;
       throw error;
     });

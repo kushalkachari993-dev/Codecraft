@@ -127,7 +127,10 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
     executionResult, setExecutionResult, executionPhase, setExecutionPhase,
     runtimeReadiness, updateRuntimeReadiness, clearRun, startRun, isCurrentRun,
     finishRun, warmExecutionRuntime, stopExecution: stopRuntimeExecution,
-  } = useLabRuntime(buildPythonPaceQuests("beginner")[0].starterCode);
+  } = useLabRuntime(
+    buildPythonPaceQuests("beginner")[0].starterCode,
+    routeReady && (view === "roadmap" || view === "quest") ? activeTrackId : null,
+  );
   const { progress, persistProgress, cloudUser, cloudState } = useProgressSync({
     clerkLoaded: Boolean(clerkLoaded),
     clerkSignedIn: Boolean(clerkSignedIn),
