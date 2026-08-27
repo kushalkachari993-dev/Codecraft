@@ -109,6 +109,12 @@ test("renders the privacy notice", async () => {
   assert.match(html, /Open account deletion controls/);
 });
 
+test("redirects the conventional favicon URL to the SVG icon", async () => {
+  const response = await render("/favicon.ico");
+  assert.equal(response.status, 308);
+  assert.equal(new URL(response.headers.get("location")).pathname, "/favicon.svg");
+});
+
 test("keeps the finished product free of starter-preview code", async () => {
   const [page, layout, packageJson, pythonCurriculum, genaiCurriculum, sqlCurriculum, challenges, executionClient, pythonRunner, sqlRunner, worker, serverConfig, workersAiAdapter, progressSource, progressRoute, d1Repository, submissionsRoute, schema, clerkAuth, clerkProvider, accountRoute, healthRoute, privacyPage, deleteAccountPage, migration, workerUrlNormalizer] = await Promise.all([
     Promise.all([
