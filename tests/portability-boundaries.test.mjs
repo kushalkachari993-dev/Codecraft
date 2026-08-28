@@ -35,7 +35,7 @@ test("Worker delegates hosted AI and persistence to adapters", async () => {
 });
 
 
-test("CI verifies lint, tests, and the production build", async () => {
+test("CI verifies lint, unit tests, browser journeys, accessibility, and the production build", async () => {
   const [workflow, packageJson] = await Promise.all([
     readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -45,6 +45,9 @@ test("CI verifies lint, tests, and the production build", async () => {
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm run lint/);
   assert.match(workflow, /npm run test:unit/);
+  assert.match(workflow, /playwright install --with-deps chromium/);
+  assert.match(workflow, /npm run test:e2e/);
+  assert.match(workflow, /actions\/upload-artifact@v6/);
   assert.match(workflow, /npm run build/);
   assert.match(workflow, /VITE_CLERK_PUBLISHABLE_KEY:\s+pk_test_/);
   assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-node)@v4/);
@@ -53,6 +56,15 @@ test("CI verifies lint, tests, and the production build", async () => {
     "CI must build the server-rendered site before tests import dist/server/index.js",
   );
   assert.match(packageJson, /"test:unit"/);
+  assert.match(packageJson, /"test:e2e":\s*"playwright test"/);
+  const [journey, accessibility] = await Promise.all([
+    readFile(new URL("./e2e/learner-journey.spec.ts", import.meta.url), "utf8"),
+    readFile(new URL("./e2e/accessibility.spec.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(journey, /real Python runtime executes/);
+  assert.match(journey, /browser Back and Forward restore/);
+  assert.match(accessibility, /AxeBuilder/);
+  assert.match(accessibility, /wcag22aa/);
 });
 
 test("heavy lesson content and browser runtimes load on demand", async () => {

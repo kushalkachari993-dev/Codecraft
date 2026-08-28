@@ -1212,7 +1212,7 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
                 <div><p className="pixel-kicker">YOUR RELAY ROUTE</p><h2>{isPacedTrack ? `${activeQuests.length} topics across ${activeModules.length} worlds.` : "Eight quests. Two realm relays to reconnect."}</h2></div>
                 <div className="course-progress" aria-label={`${progressPercent}% course complete`}>
                   <span>{completedCount}/{activeQuests.length} {isPacedTrack ? "topics" : "quests"}</span>
-                  <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}><i style={{ width: `${progressPercent}%` }} /></div>
+                  <div role="progressbar" aria-label="Course completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}><i style={{ width: `${progressPercent}%` }} /></div>
                 </div>
               </div>
 
