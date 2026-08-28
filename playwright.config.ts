@@ -1,5 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
+try {
+  process.loadEnvFile?.(".env.local");
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+}
+
+process.env.CLERK_PUBLISHABLE_KEY ??= process.env.VITE_CLERK_PUBLISHABLE_KEY;
+
 const port = 4173;
 const baseURL = `http://127.0.0.1:${port}`;
 
@@ -22,12 +30,23 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "clerk-setup",
+      testMatch: /clerk\.setup\.ts/,
+    },
+    {
       name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      testIgnore: [/clerk\.setup\.ts/, /authenticated-journey\.spec\.ts/],
+    },
+    {
+      name: "authenticated",
+      testMatch: /authenticated-journey\.spec\.ts/,
+      dependencies: ["clerk-setup"],
       use: { ...devices["Desktop Chrome"] },
     },
   ],
   webServer: {
-    command: `npx wrangler dev --config dist/server/wrangler.json --local --port ${port} --persist-to .wrangler/e2e`,
+    command: "node scripts/run-e2e-server.mjs",
     url: `${baseURL}/tracks`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

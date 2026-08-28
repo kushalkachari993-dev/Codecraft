@@ -47,16 +47,20 @@ test("CI verifies lint, unit tests, browser journeys, accessibility, and the pro
   assert.match(workflow, /npm run test:unit/);
   assert.match(workflow, /playwright install --with-deps chromium/);
   assert.match(workflow, /npm run test:e2e/);
+  assert.match(workflow, /npm run test:e2e:auth/);
+  assert.match(workflow, /CLERK_E2E_PUBLISHABLE_KEY/);
+  assert.match(workflow, /CLERK_E2E_SECRET_KEY/);
   assert.match(workflow, /actions\/upload-artifact@v6/);
   assert.match(workflow, /npm run build/);
-  assert.match(workflow, /VITE_CLERK_PUBLISHABLE_KEY:\s+pk_test_/);
+  assert.match(workflow, /VITE_CLERK_PUBLISHABLE_KEY:.*pk_test_/);
   assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-node)@v4/);
   assert.ok(
     workflow.indexOf("npm run build") < workflow.indexOf("npm run test:unit"),
     "CI must build the server-rendered site before tests import dist/server/index.js",
   );
   assert.match(packageJson, /"test:unit"/);
-  assert.match(packageJson, /"test:e2e":\s*"playwright test"/);
+  assert.match(packageJson, /"test:e2e":\s*"playwright test --project=chromium"/);
+  assert.match(packageJson, /"test:e2e:auth":\s*"playwright test --project=authenticated"/);
   const [journey, accessibility] = await Promise.all([
     readFile(new URL("./e2e/learner-journey.spec.ts", import.meta.url), "utf8"),
     readFile(new URL("./e2e/accessibility.spec.ts", import.meta.url), "utf8"),
@@ -65,6 +69,11 @@ test("CI verifies lint, unit tests, browser journeys, accessibility, and the pro
   assert.match(journey, /browser Back and Forward restore/);
   assert.match(accessibility, /AxeBuilder/);
   assert.match(accessibility, /wcag22aa/);
+  const authenticatedJourney = await readFile(new URL("./e2e/authenticated-journey.spec.ts", import.meta.url), "utf8");
+  assert.match(authenticatedJourney, /Progress synced across devices/);
+  assert.match(authenticatedJourney, /Permanently delete account/);
+  assert.match(authenticatedJourney, /CLERK_SECRET_KEY/);
+  assert.match(authenticatedJourney, /pk_test_/);
 });
 
 test("heavy lesson content and browser runtimes load on demand", async () => {
