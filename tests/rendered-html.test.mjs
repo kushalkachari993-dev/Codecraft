@@ -365,6 +365,15 @@ test("keeps the finished product free of starter-preview code", async () => {
   await access(new URL("../public/pyodide-314.0.5/python_stdlib.zip", import.meta.url));
 });
 
+test("uses a shared readable typography scale without undersized text literals", async () => {
+  const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  for (const token of ["type-micro", "type-label", "type-control", "type-small", "type-body-compact", "type-body", "type-body-large"]) {
+    assert.match(globals, new RegExp(`--${token}:`));
+  }
+  assert.doesNotMatch(globals, /font-size:\s*(?:[5-9]|1[0-3])px/);
+  assert.doesNotMatch(globals, /font:\s*(?:(?:normal\s+)?\d+\s+)?(?:[5-9]|1[0-3])px/);
+});
+
 test("prewarms and durably caches the versioned Python runtime", async () => {
   const [page, runtimeHook, runtimeCache, executionClient, pythonWorker, publicWorker, serviceWorker, headers] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
