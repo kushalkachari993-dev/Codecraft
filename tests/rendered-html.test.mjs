@@ -89,6 +89,7 @@ test("keeps the public shell cacheable and isolated from the full learning bundl
   assert.doesNotMatch(layout, /headers\(\)|generateMetadata/);
   assert.doesNotMatch(trackPage, /searchParams|CodeCraftApp/);
   assert.doesNotMatch(landing, /learning-app|python-curriculum|genai-curriculum|sql-curriculum|execution\/client/);
+  assert.match(landing, /trackAnalyticsEvent\("session_started"/);
   assert.match(worker, /PUBLIC_SHELL_PATHS = new Set\(\["\/", "\/tracks"\]\)/);
   assert.match(worker, /s-maxage=600, stale-while-revalidate=86400/);
   assert.match(worker, /response\.headers\.has\("set-cookie"\)/);

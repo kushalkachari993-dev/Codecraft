@@ -167,7 +167,7 @@ interface ExecutionContext {
 }
 
 // Bump this release key whenever the public shell or its hashed client assets change.
-const PUBLIC_SHELL_CACHE_VERSION = "2026-08-29-lcp-v1";
+const PUBLIC_SHELL_CACHE_VERSION = "2026-08-29-lcp-v2";
 const PUBLIC_SHELL_PATHS = new Set(["/", "/tracks"]);
 
 function isPublicShellRequest(request: Request, url: URL) {

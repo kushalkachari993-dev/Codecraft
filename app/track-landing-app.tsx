@@ -1,7 +1,8 @@
 "use client";
 
 import { SignInButton, useAuth, useUser } from "@clerk/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { trackAnalyticsEvent } from "./analytics-events";
 import TrackPickerView from "./components/track-picker-view";
 import { useJourney, type JourneyPaceId, type JourneyPreferences, type JourneyTrackId } from "./hooks/use-journey";
 import { useProgressSync } from "./hooks/use-progress-sync";
@@ -11,6 +12,7 @@ import { TRACKS, type Track } from "./track-catalog";
 const paceLabel = (pace: JourneyPaceId) => pace[0].toUpperCase() + pace.slice(1);
 
 export default function TrackLandingApp() {
+  const analyticsSessionTracked = useRef(false);
   const { getToken, isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useAuth();
   const { user } = useUser();
   const displayName = user?.fullName ?? user?.firstName ?? user?.primaryEmailAddress?.emailAddress ?? "CodeCraft learner";
@@ -32,6 +34,12 @@ export default function TrackLandingApp() {
     const canonical = learningPathForRoute(route);
     if (window.location.search && canonical !== current) window.location.replace(canonical);
   }, []);
+
+  useEffect(() => {
+    if (!clerkLoaded || analyticsSessionTracked.current) return;
+    analyticsSessionTracked.current = true;
+    void trackAnalyticsEvent("session_started", {}, clerkSignedIn ? getToken : undefined);
+  }, [clerkLoaded, clerkSignedIn, getToken]);
 
   const navigate = (path: string) => window.location.assign(path);
 
