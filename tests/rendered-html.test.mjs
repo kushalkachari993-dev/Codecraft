@@ -93,6 +93,7 @@ test("keeps the public shell cacheable and isolated from the full learning bundl
   assert.match(worker, /PUBLIC_SHELL_PATHS = new Set\(\["\/", "\/tracks"\]\)/);
   assert.match(worker, /s-maxage=600, stale-while-revalidate=86400/);
   assert.match(worker, /response\.headers\.has\("set-cookie"\)/);
+  assert.doesNotMatch(worker, /caches\.default|\.default \?\? null|edgeCache\.put/);
 });
 
 test("runs controlled GenAI lab evaluation without exposing a model credential", async () => {
