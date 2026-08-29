@@ -78,7 +78,7 @@ test("CI verifies lint, unit tests, browser journeys, accessibility, and the pro
 
 test("heavy lesson content and browser runtimes load on demand", async () => {
   const [page, enrichmentHook, challengeHook, runtimeHook, executionClient] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/learning-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/hooks/use-lesson-enrichment.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/hooks/use-lab-challenge.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/hooks/use-lab-runtime.ts", import.meta.url), "utf8"),

@@ -6,7 +6,7 @@ const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
 
 test("guides a first learner from recommendation to first lesson", async () => {
-  const page = (await Promise.all([read("app/page.tsx"), read("app/codecraft-catalog.tsx"), read("app/components/journey-views.tsx"), read("app/hooks/use-journey.ts")])).join("\n");
+  const page = (await Promise.all([read("app/learning-app.tsx"), read("app/codecraft-catalog.tsx"), read("app/components/journey-views.tsx"), read("app/hooks/use-journey.ts")])).join("\n");
   assert.match(page, /codecraft-journey-v1/);
   assert.match(page, /What do you want to build/);
   assert.match(page, /How familiar are you with/);
@@ -21,7 +21,7 @@ test("guides a first learner from recommendation to first lesson", async () => {
 });
 
 test("supports returning learners and explains the game economy", async () => {
-  const page = (await Promise.all([read("app/page.tsx"), read("app/codecraft-catalog.tsx"), read("app/components/journey-views.tsx"), read("app/hooks/use-journey.ts")])).join("\n");
+  const page = (await Promise.all([read("app/learning-app.tsx"), read("app/codecraft-catalog.tsx"), read("app/components/journey-views.tsx"), read("app/hooks/use-journey.ts")])).join("\n");
   assert.match(page, /CONTINUE YOUR JOURNEY/);
   assert.match(page, /Continue where I left off/);
   assert.match(page, /resumeJourney/);
@@ -31,7 +31,7 @@ test("supports returning learners and explains the game economy", async () => {
 });
 
 test("celebrates the first restored world and remains responsive", async () => {
-  const [page, styles] = await Promise.all([read("app/page.tsx"), read("app/globals.css")]);
+  const [page, styles] = await Promise.all([read("app/learning-app.tsx"), read("app/globals.css")]);
   assert.match(page, /firstWorldRestoredNow/);
   assert.match(page, /FIRST WORLD RESTORED/);
   assert.match(page, /firstWorldCelebration/);
@@ -44,7 +44,7 @@ test("celebrates the first restored world and remains responsive", async () => {
 
 test("keeps page orchestration split across domain hooks and view components", async () => {
   const [page, journeyViews] = await Promise.all([
-    read("app/page.tsx"),
+    read("app/learning-app.tsx"),
     read("app/components/journey-views.tsx"),
   ]);
   const boundaries = page + "\n" + journeyViews;

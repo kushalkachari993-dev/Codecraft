@@ -166,6 +166,25 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+// Bump this release key whenever the public shell or its hashed client assets change.
+const PUBLIC_SHELL_CACHE_VERSION = "2026-08-29-lcp-v1";
+const PUBLIC_SHELL_PATHS = new Set(["/", "/tracks"]);
+
+function isPublicShellRequest(request: Request, url: URL) {
+  const accept = request.headers.get("accept") ?? "";
+  return request.method === "GET"
+    && PUBLIC_SHELL_PATHS.has(url.pathname)
+    && accept.includes("text/html")
+    && !request.headers.has("rsc")
+    && !request.headers.has("next-router-state-tree");
+}
+
+function publicShellCacheKey(url: URL) {
+  const cacheUrl = new URL(url.origin + url.pathname);
+  cacheUrl.searchParams.set("__codecraft_shell", PUBLIC_SHELL_CACHE_VERSION);
+  return new Request(cacheUrl, { method: "GET" });
+}
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -175,6 +194,15 @@ interface ExecutionContext {
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const cacheableShell = isPublicShellRequest(request, url);
+    const edgeCache = typeof caches === "undefined"
+      ? null
+      : (caches as CacheStorage & { default?: Cache }).default ?? null;
+
+    if (cacheableShell && edgeCache) {
+      const cached = await edgeCache.match(publicShellCacheKey(url));
+      if (cached) return cached;
+    }
 
     if (url.pathname === "/api/genai-lab") return handleGenAILab(request, env);
 
@@ -189,7 +217,14 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(request, env, ctx);
+    if (!cacheableShell || !edgeCache || !response.ok || response.headers.has("set-cookie")) return response;
+
+    const headers = new Headers(response.headers);
+    headers.set("cache-control", "public, max-age=0, s-maxage=600, stale-while-revalidate=86400");
+    const cacheableResponse = new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    ctx.waitUntil(edgeCache.put(publicShellCacheKey(url), cacheableResponse.clone()));
+    return cacheableResponse;
   },
 };
 

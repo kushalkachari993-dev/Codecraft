@@ -16,7 +16,7 @@
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:auth": "playwright test --project=authenticated",
     "test:e2e:headed": "playwright test --project=chromium --headed",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern public/pyodide",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern public/pyodide --ignore-pattern playwright-report --ignore-pattern test-results",
     "db:generate": "drizzle-kit generate",
     "db:export": "node scripts/d1-export.mjs",
     "db:restore": "node scripts/d1-restore.mjs"

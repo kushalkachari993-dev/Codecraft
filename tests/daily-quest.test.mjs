@@ -14,7 +14,7 @@ test("daily quests rotate deterministically by UTC date, track, and pace", async
 });
 
 test("daily quest button opens the existing real lab runtimes", async () => {
-  const page = await read("app/page.tsx");
+  const page = await read("app/learning-app.tsx");
   assert.match(page, /Daily Quest/);
   assert.match(page, /const openDailyQuest/);
   assert.match(page, /loadLabChallenge/);
@@ -25,7 +25,7 @@ test("daily quest button opens the existing real lab runtimes", async () => {
 
 test("daily rewards are one per day, extend streaks, and sync with progress", async () => {
   const [page, progress, analytics] = await Promise.all([
-    read("app/page.tsx"),
+    read("app/learning-app.tsx"),
     read("app/progress.ts"),
     read("app/analytics-events.ts"),
   ]);
@@ -42,7 +42,7 @@ test("daily rewards are one per day, extend streaks, and sync with progress", as
 
 test("daily quest launch and challenge briefing are responsive", async () => {
   const [page, css] = await Promise.all([
-    Promise.all([read("app/page.tsx"), read("app/components/daily-quest-card.tsx"), read("app/components/lesson-stage-views.tsx")]).then((parts) => parts.join("\n")),
+    Promise.all([read("app/learning-app.tsx"), read("app/components/daily-quest-card.tsx"), read("app/components/lesson-stage-views.tsx")]).then((parts) => parts.join("\n")),
     read("app/globals.css"),
   ]);
   assert.match(page, /daily-quest-launch/);

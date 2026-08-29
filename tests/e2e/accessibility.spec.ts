@@ -3,9 +3,9 @@ import { expect, test } from "@playwright/test";
 
 const routes = [
   { path: "/tracks", ready: ".track-picker", name: "track selection" },
-  { path: "/tracks?track=python", ready: ".python-pace-picker", name: "pace selection" },
-  { path: "/tracks?track=python&pace=beginner", ready: ".roadmap-page", name: "roadmap" },
-  { path: "/lesson?track=python&pace=beginner&quest=1", ready: ".lesson-page", name: "lesson" },
+  { path: "/tracks/python", ready: ".python-pace-picker", name: "pace selection" },
+  { path: "/roadmap/python/beginner", ready: ".roadmap-page", name: "roadmap" },
+  { path: "/lesson/python/beginner/1", ready: ".lesson-page", name: "lesson" },
 ] as const;
 
 for (const route of routes) {

@@ -25,6 +25,23 @@ export function parseLearningLocation(location: string): LearningRoute {
   if (segments.length === 0) return { kind: "tracks" };
   if (segments.length === 1 && segments[0] === "profile") return { kind: "profile" };
 
+  if (segments.length === 2 && segments[0] === "tracks" && isTrackId(segments[1])) {
+    return { kind: "paces", trackId: segments[1] };
+  }
+
+  if (segments.length === 3 && segments[0] === "roadmap" && isTrackId(segments[1]) && isPaceId(segments[2])) {
+    return { kind: "roadmap", trackId: segments[1], paceId: segments[2] };
+  }
+
+  if (segments.length === 4 && segments[0] === "lesson" && isTrackId(segments[1]) && isPaceId(segments[2])) {
+    const questId = Number.parseInt(segments[3], 10);
+    if (Number.isSafeInteger(questId) && questId > 0) return { kind: "lesson", trackId: segments[1], paceId: segments[2], questId };
+  }
+
+  if (segments.length === 3 && segments[0] === "daily-quest" && isTrackId(segments[1]) && isPaceId(segments[2])) {
+    return { kind: "daily-quest", trackId: segments[1], paceId: segments[2] };
+  }
+
   if (segments.length === 1 && segments[0] === "tracks") {
     if (isTrackId(trackId) && isPaceId(paceId)) return { kind: "roadmap", trackId, paceId };
     if (isTrackId(trackId)) return { kind: "paces", trackId };
@@ -43,6 +60,15 @@ export function parseLearningLocation(location: string): LearningRoute {
   return { kind: "tracks" };
 }
 
+export function learningPathForRoute(route: LearningRoute) {
+  if (route.kind === "tracks") return "/tracks";
+  if (route.kind === "paces") return `/tracks/${route.trackId}`;
+  if (route.kind === "roadmap") return `/roadmap/${route.trackId}/${route.paceId}`;
+  if (route.kind === "lesson") return `/lesson/${route.trackId}/${route.paceId}/${route.questId}`;
+  if (route.kind === "daily-quest") return `/daily-quest/${route.trackId}/${route.paceId}`;
+  return "/profile";
+}
+
 export function learningPathForState({ view, trackId, paceId, questId, dailyQuestMode, profileOpen }: {
   view: LearningView;
   trackId: LearningTrackId;
@@ -53,8 +79,8 @@ export function learningPathForState({ view, trackId, paceId, questId, dailyQues
 }) {
   if (profileOpen) return "/profile";
   if (view === "tracks") return "/tracks";
-  if (view === "paces") return "/tracks?track=" + trackId;
-  if (view === "roadmap") return "/tracks?track=" + trackId + "&pace=" + paceId;
-  if (dailyQuestMode) return "/daily-quest?track=" + trackId + "&pace=" + paceId;
-  return "/lesson?track=" + trackId + "&pace=" + paceId + "&quest=" + questId;
+  if (view === "paces") return `/tracks/${trackId}`;
+  if (view === "roadmap") return `/roadmap/${trackId}/${paceId}`;
+  if (dailyQuestMode) return `/daily-quest/${trackId}/${paceId}`;
+  return `/lesson/${trackId}/${paceId}/${questId}`;
 }

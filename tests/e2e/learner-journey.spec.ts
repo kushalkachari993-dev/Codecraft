@@ -8,7 +8,7 @@ test("a guest can navigate from track selection through a checkpoint and optiona
 
   const pythonCard = page.locator("article.track-card.python");
   await pythonCard.getByRole("button", { name: /Choose your pace/i }).click();
-  await expect(page).toHaveURL(/\/tracks\?track=python$/);
+  await expect(page).toHaveURL(/\/tracks\/python$/);
   await expect(page.getByRole("heading", { name: /Choose your Python pace/i })).toBeVisible();
 
   const beginnerCard = page.locator("article.pace-card.beginner");
@@ -19,7 +19,7 @@ test("a guest can navigate from track selection through a checkpoint and optiona
   await tutorial.getByRole("button", { name: "Next" }).click();
   await tutorial.getByRole("button", { name: /Start first lesson/i }).click();
 
-  await expect(page).toHaveURL(/\/lesson\?track=python&pace=beginner&quest=1$/);
+  await expect(page).toHaveURL(/\/lesson\/python\/beginner\/1$/);
   await page.getByRole("button", { name: /See an explained example/i }).click();
   await page.getByRole("button", { name: /Take the checkpoint/i }).click();
   await expect(page.getByRole("heading", { name: /Prove what you learned/i })).toBeVisible();
@@ -40,21 +40,21 @@ test("a guest can navigate from track selection through a checkpoint and optiona
 });
 
 test("browser Back and Forward restore the learner's roadmap and lesson", async ({ page }) => {
-  await page.goto("/lesson?track=python&pace=beginner&quest=1");
+  await page.goto("/lesson/python/beginner/1");
   await expect(page.locator(".lesson-page")).toBeVisible();
 
   await page.getByRole("button", { name: "← Roadmap", exact: true }).click();
-  await expect(page).toHaveURL(/\/tracks\?track=python&pace=beginner$/);
+  await expect(page).toHaveURL(/\/roadmap\/python\/beginner$/);
   await page.goBack();
-  await expect(page).toHaveURL(/\/lesson\?track=python&pace=beginner&quest=1$/);
+  await expect(page).toHaveURL(/\/lesson\/python\/beginner\/1$/);
   await expect(page.locator(".lesson-page")).toBeVisible();
   await page.goForward();
-  await expect(page).toHaveURL(/\/tracks\?track=python&pace=beginner$/);
+  await expect(page).toHaveURL(/\/roadmap\/python\/beginner$/);
   await expect(page.locator(".roadmap-page")).toBeVisible();
 });
 
 test("daily quest and guest profile open from the roadmap", async ({ page }) => {
-  await page.goto("/tracks?track=python&pace=beginner");
+  await page.goto("/roadmap/python/beginner");
   await expect(page.locator(".roadmap-page")).toBeVisible();
 
   await page.locator("button.profile-card").click();
@@ -63,14 +63,14 @@ test("daily quest and guest profile open from the roadmap", async ({ page }) => 
   await page.locator("button.profile-close").click();
 
   await page.getByRole("button", { name: "Daily Quest", exact: true }).click();
-  await expect(page).toHaveURL(/\/daily-quest\?track=python&pace=beginner$/);
+  await expect(page).toHaveURL(/\/daily-quest\/python\/beginner$/);
   await expect(page.getByText(/TODAY'S RELAY CHALLENGE/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /Run Python/i })).toBeVisible();
 });
 
 test("a real Python runtime executes the daily quest starter code", async ({ page }) => {
   test.slow();
-  await page.goto("/daily-quest?track=python&pace=beginner");
+  await page.goto("/daily-quest/python/beginner");
   const runButton = page.getByRole("button", { name: /Run Python/i });
   await expect(runButton).toBeVisible({ timeout: 20_000 });
   await runButton.click();

@@ -23,7 +23,7 @@ test("includes authored first-world lessons for all three beginner tracks", asyn
 test("uses authored first-world execution missions and precise checks", async () => {
   const [page, challenges, genai] = await Promise.all([
     Promise.all([
-      readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/learning-app.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/codecraft-catalog.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/components/lesson-stage-views.tsx", import.meta.url), "utf8"),
     ]).then((parts) => parts.join("\n")),
@@ -48,4 +48,3 @@ test("uses authored first-world execution missions and precise checks", async ()
   assert.match(genai, /attention_trace\.py/);
   assert.match(genai, /generation_comparison\.py/);
 });
-

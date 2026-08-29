@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const page = (await Promise.all([
-  readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/learning-app.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/codecraft-catalog.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/components/world-map.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/components/lesson-stage-views.tsx", import.meta.url), "utf8"),

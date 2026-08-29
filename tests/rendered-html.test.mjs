@@ -35,6 +35,7 @@ test("server-renders the CodeCraft track chooser", async () => {
   assert.match(html, /ORIGINAL CODE REALMS/);
   assert.match(html, /Repair the Core Relay/);
   assert.match(html, />Python</);
+  assert.match(visibleHtml, /0\/83 topics/);
   assert.match(html, />GenAI</);
   assert.match(visibleHtml, /0\/71 topics/);
   assert.match(html, />SQL</);
@@ -45,13 +46,13 @@ test("server-renders the CodeCraft track chooser", async () => {
 });
 
 test("server-renders URL-backed learning destinations", async () => {
-  const paceResponse = await render("/tracks?track=sql");
+  const paceResponse = await render("/tracks/sql");
   assert.equal(paceResponse.status, 200);
 
-  const roadmapResponse = await render("/tracks?track=python&pace=beginner");
+  const roadmapResponse = await render("/roadmap/python/beginner");
   assert.equal(roadmapResponse.status, 200);
 
-  const lessonResponse = await render("/lesson?track=python&pace=beginner&quest=1");
+  const lessonResponse = await render("/lesson/python/beginner/1");
   assert.equal(lessonResponse.status, 200);
 
   const profileResponse = await render("/profile");
@@ -70,7 +71,27 @@ test("maps learning views to reversible browser locations", async () => {
   assert.deepEqual(navigation.parseLearningLocation("/tracks?track=python&pace=beginner"), { kind: "roadmap", trackId: "python", paceId: "beginner" });
   assert.deepEqual(navigation.parseLearningLocation("/lesson?track=genai&pace=expert&quest=7"), { kind: "lesson", trackId: "genai", paceId: "expert", questId: 7 });
   assert.deepEqual(navigation.parseLearningLocation("/daily-quest?track=sql&pace=intermediate"), { kind: "daily-quest", trackId: "sql", paceId: "intermediate" });
-  assert.equal(navigation.learningPathForState({ view: "quest", trackId: "python", paceId: "beginner", questId: 3, dailyQuestMode: false, profileOpen: false }), "/lesson?track=python&pace=beginner&quest=3");
+  assert.deepEqual(navigation.parseLearningLocation("/tracks/sql"), { kind: "paces", trackId: "sql" });
+  assert.deepEqual(navigation.parseLearningLocation("/roadmap/python/beginner"), { kind: "roadmap", trackId: "python", paceId: "beginner" });
+  assert.deepEqual(navigation.parseLearningLocation("/lesson/genai/expert/7"), { kind: "lesson", trackId: "genai", paceId: "expert", questId: 7 });
+  assert.deepEqual(navigation.parseLearningLocation("/daily-quest/sql/intermediate"), { kind: "daily-quest", trackId: "sql", paceId: "intermediate" });
+  assert.equal(navigation.learningPathForState({ view: "quest", trackId: "python", paceId: "beginner", questId: 3, dailyQuestMode: false, profileOpen: false }), "/lesson/python/beginner/3");
+});
+
+test("keeps the public shell cacheable and isolated from the full learning bundle", async () => {
+  const [layout, landing, trackPage, worker] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/track-landing-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/tracks/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.doesNotMatch(layout, /headers\(\)|generateMetadata/);
+  assert.doesNotMatch(trackPage, /searchParams|CodeCraftApp/);
+  assert.doesNotMatch(landing, /learning-app|python-curriculum|genai-curriculum|sql-curriculum|execution\/client/);
+  assert.match(worker, /PUBLIC_SHELL_PATHS = new Set\(\["\/", "\/tracks"\]\)/);
+  assert.match(worker, /s-maxage=600, stale-while-revalidate=86400/);
+  assert.match(worker, /response\.headers\.has\("set-cookie"\)/);
 });
 
 test("runs controlled GenAI lab evaluation without exposing a model credential", async () => {
@@ -118,7 +139,7 @@ test("redirects the conventional favicon URL to the SVG icon", async () => {
 test("keeps the finished product free of starter-preview code", async () => {
   const [page, layout, packageJson, pythonCurriculum, genaiCurriculum, sqlCurriculum, challenges, executionClient, pythonRunner, sqlRunner, worker, serverConfig, workersAiAdapter, progressSource, progressRoute, d1Repository, submissionsRoute, schema, clerkAuth, clerkProvider, accountRoute, healthRoute, privacyPage, deleteAccountPage, migration, workerUrlNormalizer] = await Promise.all([
     Promise.all([
-      readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/learning-app.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/codecraft-catalog.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/components/journey-views.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/components/profile-panel.tsx", import.meta.url), "utf8"),
@@ -356,7 +377,8 @@ test("keeps the finished product free of starter-preview code", async () => {
     );
   }
   assert.doesNotMatch(protectedBrandSources, /scene-cave/i);
-  assert.match(layout, /new URL\("\/og-v2\.png", origin\)/);
+  assert.match(layout, /metadataBase: new URL\(siteUrl\)/);
+  assert.doesNotMatch(layout, /headers\(\)|generateMetadata/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.doesNotMatch(page, /SkeletonPreview|codex-preview/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
@@ -376,7 +398,7 @@ test("uses a shared readable typography scale without undersized text literals",
 
 test("prewarms and durably caches the versioned Python runtime", async () => {
   const [page, runtimeHook, runtimeCache, executionClient, pythonWorker, publicWorker, serviceWorker, headers] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/learning-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/hooks/use-lab-runtime.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/execution/runtime-cache.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/execution/client.ts", import.meta.url), "utf8"),
