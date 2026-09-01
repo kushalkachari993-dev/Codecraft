@@ -42,11 +42,19 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px
   backdrop-filter: blur(14px);
 }
 .brand { display: flex; align-items: center; justify-self: start; gap: 12px; border: 0; background: transparent; font: 900 18px/1 var(--font-geist-mono), monospace; letter-spacing: 1.5px; }
-.brand-cube { position: relative; display: grid; place-items: center; width: 32px; height: 32px; background: #073841; border: 3px solid var(--cyan); box-shadow: 4px 4px 0 #004a57, 0 0 18px #20f0d055; transform: rotate(45deg) scale(.72); }
+.brand-cube { position: relative; display: grid; place-items: center; width: 32px; height: 32px; background: #073841; border: 3px solid var(--cyan); box-shadow: 4px 4px 0 #004a57, 0 0 18px #20f0d055; transform: rotate(45deg) scale(.72); animation: relay-core-pulse 3.6s ease-in-out infinite; }
 .brand-cube::before, .brand-cube::after, .brand-cube i { position: absolute; content: ""; }
 .brand-cube::before { width: 4px; height: 4px; left: 5px; top: 5px; background: var(--lime); box-shadow: 14px 0 0 var(--cyan), 0 14px 0 var(--cyan), 14px 14px 0 var(--lime); }
-.brand-cube::after { inset: -8px; border: 1px solid #35ecd577; }
+.brand-cube::after { inset: -8px; border: 1px solid #35ecd577; animation: relay-ring-pulse 3.6s ease-in-out infinite; }
 .brand-cube i { inset: 8px; background: var(--lime); box-shadow: 0 0 13px #baff4aaa; }
+@keyframes relay-core-pulse {
+  0%, 100% { box-shadow: 4px 4px 0 #004a57, 0 0 14px #20f0d044; transform: rotate(45deg) scale(.72); }
+  50% { box-shadow: 4px 4px 0 #004a57, 0 0 25px #20f0d088; transform: rotate(45deg) scale(.76); }
+}
+@keyframes relay-ring-pulse {
+  0%, 100% { opacity: .48; transform: scale(.92); }
+  50% { opacity: .92; transform: scale(1.06); }
+}
 .main-nav { align-self: stretch; display: flex; align-items: center; gap: 8px; }
 .main-nav button { height: 100%; padding: 0 18px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); font-weight: 750; }
 .main-nav button.active, .main-nav button:hover { color: var(--text); border-bottom-color: var(--cyan); }
@@ -170,7 +178,13 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px
 .track-art::before { position: absolute; inset: auto -8% 0; height: 62px; content: ""; background-color: #082329; background-image: linear-gradient(color-mix(in srgb, var(--track), transparent 58%) 2px, transparent 2px), linear-gradient(90deg, color-mix(in srgb, var(--track), transparent 58%) 2px, transparent 2px); background-size: 22px 22px; border-top: 4px solid var(--track); box-shadow: 0 -7px 22px color-mix(in srgb, var(--track), transparent 55%); clip-path: polygon(5% 32%, 22% 32%, 22% 18%, 39% 18%, 39% 36%, 61% 36%, 61% 13%, 78% 13%, 78% 30%, 95% 30%, 100% 100%, 0 100%); }
 .track-card.genai .track-art::before, .track-card.sql .track-art::before { background-color: var(--track-soft); }
 .track-art::after { position: absolute; right: 0; bottom: 23px; left: 0; height: 3px; content: ""; background: repeating-linear-gradient(90deg, transparent 0 9%, var(--track) 9% 11%, transparent 11% 22%); filter: drop-shadow(0 0 5px var(--track)); opacity: .72; }
-.track-art > span { position: relative; z-index: 2; display: grid; place-items: center; width: 82px; height: 82px; background: linear-gradient(145deg, #eaffff, var(--track) 28%, var(--track-soft)); color: #031016; border: 4px solid #e5ffff; box-shadow: 8px 8px 0 #03060d, 0 0 28px color-mix(in srgb, var(--track), transparent 40%), inset 0 -14px 0 #00000025; clip-path: polygon(25% 0, 75% 0, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0 75%, 0 25%); font: 900 24px/1 var(--font-geist-mono), monospace; }
+.track-art > span { position: relative; z-index: 2; display: grid; place-items: center; width: 82px; height: 82px; background: linear-gradient(145deg, #eaffff, var(--track) 28%, var(--track-soft)); color: #031016; border: 4px solid #e5ffff; box-shadow: 8px 8px 0 #03060d, 0 0 28px color-mix(in srgb, var(--track), transparent 40%), inset 0 -14px 0 #00000025; clip-path: polygon(25% 0, 75% 0, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0 75%, 0 25%); font: 900 24px/1 var(--font-geist-mono), monospace; animation: track-core-float 4.2s ease-in-out infinite; }
+.track-card:nth-child(2) .track-art > span { animation-delay: -1.4s; }
+.track-card:nth-child(3) .track-art > span { animation-delay: -2.8s; }
+@keyframes track-core-float {
+  0%, 100% { transform: translateY(2px) rotate(-1deg); }
+  50% { transform: translateY(-7px) rotate(1deg); }
+}
 .track-art > i { position: absolute; top: 28px; left: 12%; width: 13px; height: 13px; background: var(--track); box-shadow: 0 0 14px var(--track), 18px 18px 0 -3px var(--track); transform: rotate(45deg); }.track-art > i:last-child { left: auto; right: 13%; top: 44px; transform: rotate(45deg) scale(.7); }
 .track-card-body { display: flex; flex-direction: column; height: 100%; padding: 23px; }.track-card-body > p { margin: 0 0 8px; color: var(--track); font: 800 var(--type-control)/1 var(--font-geist-mono), monospace; letter-spacing: 1.5px; }
 .track-card-body h2 { margin: 0; font: 900 30px/1.05 var(--font-geist-mono), monospace; }.track-card-body > strong { display: block; margin: 6px 0 13px; color: #cad5e5; font-size: var(--type-body-large); }.track-card-body > span { display: block; min-height: 68px; color: var(--muted); font-size: var(--type-body-large); line-height: 1.55; }
