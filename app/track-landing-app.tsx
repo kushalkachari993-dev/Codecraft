@@ -8,6 +8,9 @@ import { useJourney, type JourneyPaceId, type JourneyPreferences, type JourneyTr
 import { useProgressSync } from "./hooks/use-progress-sync";
 import { learningPathForRoute, parseLearningLocation } from "./navigation";
 import { TRACKS, type Track } from "./track-catalog";
+import { CLOUD_PATH_TOTAL, getCloudPath } from "./cloud/track";
+import { getCloudLessons } from "./cloud/catalog";
+import { getDailyQuestIndex } from "./daily-quest";
 
 const paceLabel = (pace: JourneyPaceId) => pace[0].toUpperCase() + pace.slice(1);
 
@@ -52,12 +55,12 @@ export default function TrackLandingApp() {
   const resolveResumeDestination = (): JourneyPreferences => {
     if (journey.started) return journey;
     const bestProgress = Object.entries(progress.completed)
-      .filter(([key]) => key.includes("-"))
+      .filter(([key, ids]) => key.includes("-") && ids.length > 0)
       .sort((left, right) => right[1].length - left[1].length)[0];
     if (bestProgress) {
       const [trackId, paceId] = bestProgress[0].split("-");
       return {
-        trackId: trackId === "genai" || trackId === "sql" ? trackId : "python",
+        trackId: trackId === "genai" || trackId === "sql" || trackId === "cloud" ? trackId : "python",
         paceId: paceId === "intermediate" || paceId === "expert" ? paceId : "beginner",
         started: true,
         tutorialComplete: true,
@@ -72,11 +75,13 @@ export default function TrackLandingApp() {
     navigate(`/roadmap/${destination.trackId}/${destination.paceId}`);
   };
 
-  const dailyTrackId: JourneyTrackId = journey.started ? journey.trackId : goalRecommendation;
+  const chosenTrackId: JourneyTrackId = journey.started ? journey.trackId : goalRecommendation;
+  const dailyTrackId = chosenTrackId;
   const dailyPaceId: JourneyPaceId = journey.started ? journey.paceId : paceRecommendation;
   const dailyTrack = TRACKS.find((track) => track.id === dailyTrackId) ?? TRACKS[0];
   const today = new Date().toISOString().slice(0, 10);
   const dailyCompleted = progress.game.dailyQuestDate === today && progress.game.dailyQuestCompleted;
+  const cloudDailyLesson = chosenTrackId === "cloud" ? getCloudLessons(dailyPaceId)[getDailyQuestIndex(today, "cloud", dailyPaceId, CLOUD_PATH_TOTAL)] : undefined;
 
   return (
     <main className="app-shell track-python">
@@ -103,12 +108,12 @@ export default function TrackLandingApp() {
       <TrackPickerView
         journey={journey}
         totalBadges={totalBadges}
-        savedTrackLabel={savedTrack.label}
-        savedPaceLabel={paceLabel(journey.paceId)}
+        savedTrackLabel={journey.trackId === "cloud" ? "Cloud Engineering" : savedTrack.label}
+        savedPaceLabel={journey.trackId === "cloud" ? getCloudPath(journey.paceId).title : paceLabel(journey.paceId)}
         dailyQuest={{
           completed: dailyCompleted,
-          title: "Today’s Relay Challenge",
-          trackLabel: dailyTrack.label,
+          title: cloudDailyLesson?.title ?? "Today’s Relay Challenge",
+          trackLabel: chosenTrackId === "cloud" ? "Cloud Engineering" : dailyTrack.label,
           paceLabel: paceLabel(dailyPaceId),
           streak: progress.game.dailyQuestStreak,
           onOpen: () => navigate(`/daily-quest/${dailyTrackId}/${dailyPaceId}`),

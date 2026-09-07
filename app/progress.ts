@@ -2,6 +2,7 @@ export const PROGRESS_KEYS = [
   "python", "python-beginner", "python-intermediate", "python-expert",
   "genai", "genai-beginner", "genai-intermediate", "genai-expert",
   "sql", "sql-beginner", "sql-intermediate", "sql-expert",
+  "cloud-beginner", "cloud-intermediate", "cloud-expert",
 ] as const;
 
 export type AvatarId = "relay-scout" | "signal-mage" | "core-runner";

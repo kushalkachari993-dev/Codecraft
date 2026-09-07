@@ -4,6 +4,7 @@ import type { JourneyPreferences, JourneyTrackId } from "../hooks/use-journey";
 import type { PlayerProgress } from "../progress";
 import { TRACK_MATCH, TRACK_TOPIC_TOTALS, TRACKS, type Track } from "../track-catalog";
 import DailyQuestCard from "./daily-quest-card";
+import CloudTrackCard from "./cloud-track-card";
 
 function FirstRunChecklist({ activeStep }: { activeStep: number }) {
   const steps = ["Choose a track", "Set your pace", "Learn the game loop", "Complete your first lesson"];
@@ -43,9 +44,10 @@ export default function TrackPickerView({ journey, totalBadges, savedTrackLabel,
           <button className={recommendation === "python" ? "active" : ""} onClick={() => onRecommend("python")}><strong>Programming foundations</strong><span>Software, automation, APIs</span></button>
           <button className={recommendation === "genai" ? "active" : ""} onClick={() => onRecommend("genai")}><strong>AI applications</strong><span>RAG, agents, evaluation</span></button>
           <button className={recommendation === "sql" ? "active" : ""} onClick={() => onRecommend("sql")}><strong>Data systems</strong><span>Analysis, databases, scale</span></button>
+          <button className={recommendation === "cloud" ? "active" : ""} onClick={() => onRecommend("cloud")}><strong>Cloud infrastructure</strong><span>Deploy, secure, operate</span></button>
         </div>
       </section>
-      <div className="track-grid">
+      <div className="track-grid four-tracks">
         {TRACKS.map((track) => {
           const totals = TRACK_TOPIC_TOTALS[track.id];
           const total = totals.beginner + totals.intermediate + totals.expert;
@@ -66,6 +68,7 @@ export default function TrackPickerView({ journey, totalBadges, savedTrackLabel,
             </article>
           );
         })}
+        <CloudTrackCard progress={progress} recommended={recommendation === "cloud"} />
       </div>
       <div className="codecraft-lore" aria-label="CodeCraft universe"><article><span>01</span><div><small>YOUR GUIDE</small><strong>Byte</strong><p>A relay guardian who turns your code into actions inside each realm.</p></div></article><article><span>02</span><div><small>YOUR POWER</small><strong>Signal shards</strong><p>Earned through understanding, checkpoints, and optional practice.</p></div></article><article><span>03</span><div><small>YOUR MISSION</small><strong>The Core Relay</strong><p>Reconnect every realm and return knowledge to the network.</p></div></article></div>
       <div className="track-picker-note"><span>◆</span><p><strong>{cloudUser ? "Progress synced across devices" : "Progress stays with you"}</strong>{cloudUser ? `Signed in as ${cloudUser.displayName}. Local progress was merged safely with your cloud save.` : "Your XP, badges, and restored systems stay on this device. Sign in above to migrate and sync them."}</p></div>

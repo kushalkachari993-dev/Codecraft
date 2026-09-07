@@ -23,6 +23,23 @@ test("daily quest button opens the existing real lab runtimes", async () => {
   assert.match(page, /warmExecutionRuntime/);
 });
 
+test("Cloud Daily Quests reuse the deterministic rotation and shared reward contract", async () => {
+  const [cloudApp, cloudProgress, cloudRoute, landing] = await Promise.all([
+    read("app/cloud/cloud-app.tsx"),
+    read("app/cloud/progress.ts"),
+    read("app/daily-quest/cloud/[paceId]/page.tsx"),
+    read("app/track-landing-app.tsx"),
+  ]);
+  assert.match(cloudApp, /getDailyQuestIndex/);
+  assert.match(cloudApp, /TODAY.*CLOUD RELAY CHALLENGE/);
+  assert.match(cloudProgress, /completeCloudDailyQuest/);
+  assert.match(cloudProgress, /getDailyQuestStreak/);
+  assert.match(cloudProgress, /Daily Quest Cache/);
+  assert.match(cloudRoute, /<CloudApp paceId={paceId} daily/);
+  assert.match(landing, /cloudDailyLesson/);
+  assert.doesNotMatch(landing, /Python Daily Quest/);
+});
+
 test("daily rewards are one per day, extend streaks, and sync with progress", async () => {
   const [page, progress, analytics] = await Promise.all([
     read("app/learning-app.tsx"),

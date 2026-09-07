@@ -39,10 +39,56 @@ test("server-renders the CodeCraft track chooser", async () => {
   assert.match(html, />GenAI</);
   assert.match(visibleHtml, /0\/71 topics/);
   assert.match(html, />SQL</);
+  assert.match(html, />Cloud Engineering</);
   assert.match(visibleHtml, /0\/78 topics/);
   assert.match(html, /Choose your pace/);
   assert.doesNotMatch(html, /codex-preview/);
   assert.doesNotMatch(html, /Your site is taking shape/);
+});
+
+test("server-renders the dedicated Cloud routes and rejects nonexistent lessons", async () => {
+  const picker = await render("/tracks/cloud");
+  assert.equal(picker.status, 200);
+  const pickerHtml = await picker.text();
+  assert.match(pickerHtml, /CLOUD ENGINEERING TRAIL/);
+  assert.match(pickerHtml, />Beginner</);
+  assert.match(pickerHtml, />Intermediate</);
+  assert.match(pickerHtml, />Expert</);
+  assert.match(pickerHtml, /21(?:<!-- -->)? TOPICS/);
+
+  for (const [path, firstWorld, finalWorld] of [
+    ["/roadmap/cloud/beginner", "Foundation Spire", "Service Harbor"],
+    ["/roadmap/cloud/intermediate", "Infrastructure Forge", "Production Control"],
+    ["/roadmap/cloud/expert", "Platform Nexus", "Platform Commons"],
+  ]) {
+    const response = await render(path);
+    assert.equal(response.status, 200, path);
+    const html = await response.text();
+    assert.match(html, /CLOUD CITADEL/);
+    assert.match(html, /Simulation-only labs/);
+    assert.match(html, new RegExp(firstWorld));
+    assert.match(html, new RegExp(finalWorld));
+  }
+  for (const [path, lessonTitle] of [
+    ["/lesson/cloud/beginner/1", "Who owns the problem"],
+    ["/lesson/cloud/intermediate/1", "Protect infrastructure state"],
+    ["/lesson/cloud/expert/1", "Design account boundaries"],
+    ["/lesson/cloud/beginner/21", "Operate the Cloud Citadel"],
+    ["/lesson/cloud/intermediate/21", "Production control loop"],
+    ["/lesson/cloud/expert/21", "Governed platform commons"],
+  ]) {
+    const lesson = await render(path);
+    assert.equal(lesson.status, 200, path);
+    assert.match(await lesson.text(), new RegExp(lessonTitle));
+  }
+  for (const paceId of ["beginner", "intermediate", "expert"]) {
+    const daily = await render("/daily-quest/cloud/" + paceId);
+    assert.equal(daily.status, 200, paceId);
+    assert.match(await daily.text(), /DAILY QUEST/);
+  }
+  for (const path of ["/lesson/cloud/beginner/22", "/lesson/cloud/intermediate/1oops", "/lesson/cloud/expert/0", "/daily-quest/cloud/professional"]) {
+    assert.equal((await render(path)).status, 404, path);
+  }
 });
 
 test("server-renders URL-backed learning destinations", async () => {

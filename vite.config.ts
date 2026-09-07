@@ -52,6 +52,7 @@ export default defineConfig(async () => {
       vinext(),
       sites(),
       cloudflare({
+        remoteBindings: process.env.CODECRAFT_LOCAL_ONLY !== "true",
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,
       }),

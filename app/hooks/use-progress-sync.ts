@@ -115,5 +115,5 @@ export function useProgressSync({ clerkLoaded, clerkSignedIn, displayName, email
     setProgress(normalized);
   };
 
-  return { progress, persistProgress, cloudUser, cloudState };
+  return { progress, persistProgress, cloudUser, cloudState, progressReady };
 }
