@@ -5,6 +5,7 @@ export type LearningPaceId = "beginner" | "intermediate" | "expert";
 export type LearningRoute =
   | { kind: "tracks" }
   | { kind: "cloud"; paceId?: LearningPaceId; questId?: number; roadmap?: boolean; daily?: boolean }
+  | { kind: "backend"; paceId?: LearningPaceId; questId?: number; roadmap?: boolean; daily?: boolean }
   | { kind: "paces"; trackId: LearningTrackId }
   | { kind: "roadmap"; trackId: LearningTrackId; paceId: LearningPaceId }
   | { kind: "lesson"; trackId: LearningTrackId; paceId: LearningPaceId; questId: number }
@@ -13,7 +14,7 @@ export type LearningRoute =
 
 const TRACK_IDS = new Set<LearningTrackId>(["python", "genai", "sql"]);
 const PACE_IDS = new Set<LearningPaceId>(["beginner", "intermediate", "expert"]);
-const CLOUD_LESSON_LIMIT = 21;
+const SPECIAL_TRACK_LESSON_LIMIT = 21;
 
 const isTrackId = (value: string | undefined): value is LearningTrackId => Boolean(value && TRACK_IDS.has(value as LearningTrackId));
 const isPaceId = (value: string | undefined): value is LearningPaceId => Boolean(value && PACE_IDS.has(value as LearningPaceId));
@@ -31,9 +32,17 @@ export function parseLearningLocation(location: string): LearningRoute {
   if (segments.length === 3 && segments[0] === "roadmap" && segments[1] === "cloud" && isPaceId(segments[2])) return { kind: "cloud", paceId: segments[2], roadmap: true };
   if (segments.length === 4 && segments[0] === "lesson" && segments[1] === "cloud" && isPaceId(segments[2]) && /^[0-9]+$/.test(segments[3])) {
     const questId = Number(segments[3]);
-    if (questId >= 1 && questId <= CLOUD_LESSON_LIMIT) return { kind: "cloud", paceId: segments[2], questId };
+    if (questId >= 1 && questId <= SPECIAL_TRACK_LESSON_LIMIT) return { kind: "cloud", paceId: segments[2], questId };
   }
   if (segments.length === 3 && segments[0] === "daily-quest" && segments[1] === "cloud" && isPaceId(segments[2])) return { kind: "cloud", paceId: segments[2], daily: true };
+
+  if (url.pathname === "/tracks/backend" || url.pathname === "/tracks/backend/") return { kind: "backend" };
+  if (segments.length === 3 && segments[0] === "roadmap" && segments[1] === "backend" && isPaceId(segments[2])) return { kind: "backend", paceId: segments[2], roadmap: true };
+  if (segments.length === 4 && segments[0] === "lesson" && segments[1] === "backend" && isPaceId(segments[2]) && /^[0-9]+$/.test(segments[3])) {
+    const questId = Number(segments[3]);
+    if (questId >= 1 && questId <= SPECIAL_TRACK_LESSON_LIMIT) return { kind: "backend", paceId: segments[2], questId };
+  }
+  if (segments.length === 3 && segments[0] === "daily-quest" && segments[1] === "backend" && isPaceId(segments[2])) return { kind: "backend", paceId: segments[2], daily: true };
 
   if (segments.length === 2 && segments[0] === "tracks" && isTrackId(segments[1])) {
     return { kind: "paces", trackId: segments[1] };
@@ -71,9 +80,9 @@ export function parseLearningLocation(location: string): LearningRoute {
 }
 
 export function learningPathForRoute(route: LearningRoute) {
-  if (route.kind === "cloud") {
+  if (route.kind === "cloud" || route.kind === "backend") {
     const paceId = route.paceId ?? "beginner";
-    return route.daily ? `/daily-quest/cloud/${paceId}` : route.questId ? `/lesson/cloud/${paceId}/${route.questId}` : route.roadmap ? `/roadmap/cloud/${paceId}` : "/tracks/cloud";
+    return route.daily ? `/daily-quest/${route.kind}/${paceId}` : route.questId ? `/lesson/${route.kind}/${paceId}/${route.questId}` : route.roadmap ? `/roadmap/${route.kind}/${paceId}` : "/tracks/" + route.kind;
   }
   if (route.kind === "tracks") return "/tracks";
   if (route.kind === "paces") return `/tracks/${route.trackId}`;

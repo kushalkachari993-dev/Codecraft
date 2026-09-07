@@ -8,7 +8,7 @@ import type { SavedSubmission, SubmissionsState } from "../hooks/use-profile";
 type AvatarOption = { id: AvatarId; name: string; glyph: string; description: string; unlockAt: number };
 type ActiveAvatar = Pick<AvatarOption, "id" | "name" | "glyph">;
 type TrackProfileStat = {
-  id: "python" | "genai" | "sql" | "cloud";
+  id: "python" | "genai" | "sql" | "cloud" | "backend";
   icon: string;
   label: string;
   completed: number;

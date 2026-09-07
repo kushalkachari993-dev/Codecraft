@@ -3,6 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { DAILY_QUEST_XP } from "../daily-quest";
+import { evaluateBackendArtifact, getBackendArtifact } from "../backend/artifacts";
+import { getBackendCheckpoints } from "../backend/checkpoints";
+import { getBackendEvidenceExercise } from "../backend/evidence";
+import { backendLessonXp } from "../backend/progress";
+import { BACKEND_PATH_TOTAL, getBackendPath, isBackendWorldProject } from "../backend/track";
 import { evaluateCloudArtifact, getCloudArtifact, type CloudArtifactResult } from "./artifacts";
 import { getCloudCheckpoints } from "./checkpoints";
 import { getCloudEvidenceExercise } from "./evidence";
@@ -10,20 +15,25 @@ import { evaluateCloudPlan, parseCloudPlan, serializeCloudPlan, type CloudLesson
 import { cloudLessonXp } from "./progress";
 import { CLOUD_PATH_TOTAL, getCloudPath, isCloudWorldProject, type CloudPaceId } from "./track";
 
-const lessonPath = (paceId: CloudPaceId, id: number) => "/lesson/cloud/" + paceId + "/" + id;
+const lessonPath = (trackId: "cloud" | "backend", paceId: CloudPaceId, id: number) => "/lesson/" + trackId + "/" + paceId + "/" + id;
 const FORMATS: CloudPlanFormat[] = ["json", "hcl", "yaml"];
 const formatLabel = (format: CloudPlanFormat) => format === "hcl" ? "HCL" : format.toUpperCase();
 
-export default function CloudLab({ paceId, lesson, completed, daily = false, onComplete }: {
-  paceId: CloudPaceId; lesson: CloudLesson; completed: boolean; daily?: boolean; onComplete: () => void;
+export default function CloudLab({ paceId, lesson, completed, daily = false, trackKind = "cloud", onComplete }: {
+  paceId: CloudPaceId; lesson: CloudLesson; completed: boolean; daily?: boolean; trackKind?: "cloud" | "backend"; onComplete: () => void;
 }) {
-  const path = getCloudPath(paceId);
-  const checkpoints = getCloudCheckpoints(paceId, lesson);
-  const evidence = getCloudEvidenceExercise(paceId, lesson);
-  const artifact = getCloudArtifact(paceId, lesson);
-  const worldProject = isCloudWorldProject(paceId, lesson.id);
-  const draftKey = (planFormat: CloudPlanFormat) => "codecraft-cloud-draft-v2-" + paceId + "-" + lesson.id + "-" + planFormat;
-  const artifactDraftKey = "codecraft-cloud-artifact-v1-" + paceId + "-" + lesson.id + "-" + artifact.kind;
+  const backend = trackKind === "backend";
+  const trackLabel = backend ? "Backend Engineering" : "Cloud Engineering";
+  const trackShortLabel = backend ? "Backend" : "Cloud";
+  const lessonTotal = backend ? BACKEND_PATH_TOTAL : CLOUD_PATH_TOTAL;
+  const path = backend ? getBackendPath(paceId) : getCloudPath(paceId);
+  const checkpoints = backend ? getBackendCheckpoints(paceId, lesson) : getCloudCheckpoints(paceId, lesson);
+  const evidence = backend ? getBackendEvidenceExercise(paceId, lesson) : getCloudEvidenceExercise(paceId, lesson);
+  const artifact = backend ? getBackendArtifact(paceId, lesson) : getCloudArtifact(paceId, lesson);
+  const evaluateArtifact = backend ? evaluateBackendArtifact : evaluateCloudArtifact;
+  const worldProject = backend ? isBackendWorldProject(paceId, lesson.id) : isCloudWorldProject(paceId, lesson.id);
+  const draftKey = (planFormat: CloudPlanFormat) => "codecraft-" + trackKind + "-draft-v2-" + paceId + "-" + lesson.id + "-" + planFormat;
+  const artifactDraftKey = "codecraft-" + trackKind + "-artifact-v1-" + paceId + "-" + lesson.id + "-" + artifact.kind;
   const [format, setFormat] = useState<CloudPlanFormat>("json");
   const [code, setCode] = useState(() => {
     try {
@@ -109,7 +119,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, onC
   };
   const runArtifact = () => {
     setArtifactAttempts((count) => count + 1);
-    setArtifactResult(evaluateCloudArtifact(artifact, artifactCode));
+    setArtifactResult(evaluateArtifact(artifact, artifactCode));
   };
   const loadArtifactFailure = () => editArtifact(artifact.starter);
   const complete = () => {
@@ -122,7 +132,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, onC
       setSaveError("Resolve the evidence investigation before completing this lesson.");
       return;
     }
-    const reviewedArtifact = evaluateCloudArtifact(artifact, artifactCode);
+    const reviewedArtifact = evaluateArtifact(artifact, artifactCode);
     setArtifactResult(reviewedArtifact);
     if (!reviewedArtifact.passed) {
       setSaveError("Repair every static artifact check before completing this lesson.");
@@ -139,17 +149,17 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, onC
   };
   const download = () => {
     const checked = evaluateCloudPlan(lesson, code, format);
-    const reviewedArtifact = evaluateCloudArtifact(artifact, artifactCode);
+    const reviewedArtifact = evaluateArtifact(artifact, artifactCode);
     if (!checked.passed || !reviewedArtifact.passed) { setResult(checked); setArtifactResult(reviewedArtifact); return; }
-    const report = { format: "CodeCraft Cloud review bundle v3 — educational simulation only", sourceFormat: formatLabel(format), lesson: lesson.title, plan: checked.plan, checks: checked.checks.map(({ name, passed }) => ({ name, passed })), observations: checked.observations, evidenceExercise: evidence.label, artifact: { kind: artifact.kind, filename: artifact.filename, source: artifactCode, checks: reviewedArtifact.checks.map(({ name, passed }) => ({ name, passed })) }, warning: "Static training output only. No infrastructure was created, no credentials were used, and costs are fictional." };
+    const report = { format: "CodeCraft " + trackShortLabel + " review bundle v3 — educational simulation only", sourceFormat: formatLabel(format), lesson: lesson.title, plan: checked.plan, checks: checked.checks.map(({ name, passed }) => ({ name, passed })), observations: checked.observations, evidenceExercise: evidence.label, artifact: { kind: artifact.kind, filename: artifact.filename, source: artifactCode, checks: reviewedArtifact.checks.map(({ name, passed }) => ({ name, passed })) }, warning: backend ? "Static backend training output only. No service, database, queue, or external API was contacted." : "Static training output only. No infrastructure was created, no credentials were used, and costs are fictional." };
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "codecraft-relay-launch.json";
+    anchor.download = "codecraft-" + trackKind + "-review.json";
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const rewardXp = daily ? DAILY_QUEST_XP : cloudLessonXp(lesson.id, paceId);
+  const rewardXp = daily ? DAILY_QUEST_XP : backend ? backendLessonXp(lesson.id, paceId) : cloudLessonXp(lesson.id, paceId);
   const canComplete = result?.passed === true && checkpointPassed && evidencePassed && artifactPassed;
 
   return (
@@ -161,7 +171,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, onC
         <span className={result?.passed && evidencePassed && artifactPassed ? "done" : checkpointPassed ? "active" : ""}><a href="#cloud-lab-title"><i>{result?.passed && evidencePassed && artifactPassed ? "✓" : "4"}</i>Practice</a></span>
         <span className={completed ? "done" : ""}><a href="#cloud-complete"><i>{completed ? "✓" : "5"}</i>Complete</a></span>
       </nav>
-      <div className="quest-story-strip"><span aria-hidden="true">◆<small>BYTE</small></span><p><strong>Byte’s briefing</strong>{lesson.story}</p><div aria-label={"Lesson " + lesson.id + " of " + CLOUD_PATH_TOTAL}>{Array.from({ length: 5 }, (_, index) => <i key={index} className={index <= (lesson.id - 1) % 5 ? "active" : ""} />)}</div></div>
+      <div className="quest-story-strip"><span aria-hidden="true">◆<small>BYTE</small></span><p><strong>Byte’s briefing</strong>{lesson.story}</p><div aria-label={"Lesson " + lesson.id + " of " + lessonTotal}>{Array.from({ length: 5 }, (_, index) => <i key={index} className={index <= (lesson.id - 1) % 5 ? "active" : ""} />)}</div></div>
       <div className="lesson-workspace cloud-workspace">
         <article className="lesson-content cloud-reading" id="cloud-reading" aria-labelledby="cloud-objective">
           <div className="lesson-copy">
@@ -190,15 +200,15 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, onC
               </section>;
             })}</div>
           </section>
-          <details className="cloud-json-help" open={lesson.id === 1}><summary>How the two local practice editors differ</summary><p>The Relay plan simulator uses one flat configuration in JSON, HCL, or YAML so the same architecture model can be compared across formats.</p><pre><code>{'JSON   "replicas": 2\nHCL    replicas = 2\nYAML   replicas: 2'}</code></pre><p>The artifact studio uses realistic nested Terraform, Kubernetes, IAM, or CI/CD text. Its static rules never execute a command, contact a provider, or require credentials.</p></details>
+          <details className="cloud-json-help" open={lesson.id === 1}><summary>How the two local practice editors differ</summary><p>The Relay plan simulator uses one flat configuration in JSON, HCL, or YAML so the same architecture model can be compared across formats.</p><pre><code>{'JSON   "timeout_ms": 500\nHCL    timeout_ms = 500\nYAML   timeout_ms: 500'}</code></pre><p>{backend ? "The artifact studio uses realistic nested OpenAPI, service configuration, SQL migration, and event-schema text." : "The artifact studio uses realistic nested Terraform, Kubernetes, IAM, or CI/CD text."} Its static rules never execute a command, contact a provider, or require credentials.</p></details>
           <p className="cloud-reference">Go deeper: <a href={lesson.source.url} target="_blank" rel="noreferrer">{lesson.source.label} ↗</a></p>
           </div>
         </article>
         <section className="coding-station cloud-lab" aria-labelledby="cloud-lab-title">
           <p className="pixel-kicker">STEP 4 · REPAIR AND TROUBLESHOOT</p>
-          <h2 id="cloud-lab-title">{worldProject ? "Multi-stage Cloud mission" : "Your Cloud operations lab"}</h2>
+          <h2 id="cloud-lab-title">{worldProject ? "Multi-stage " + trackShortLabel + " mission" : "Your " + trackLabel + " lab"}</h2>
           <p className="cloud-mission">{lesson.mission}</p>
-          <p className="cloud-simulation-note"><strong>Local, static training only.</strong> No provider login, live infrastructure, external API, credentials, or cloud charges. Every scanner runs deterministically in this page.</p>
+          <p className="cloud-simulation-note"><strong>Local, static training only.</strong> {backend ? "No server, database, queue, external API, or credentials are used." : "No provider login, live infrastructure, external API, credentials, or cloud charges."} Every scanner runs deterministically in this page.</p>
           {worldProject && <section className="cloud-capstone-stages" aria-labelledby="cloud-capstone-title">
             <div><small>WORLD PROJECT</small><h3 id="cloud-capstone-title">Four-stage architecture and recovery review</h3><p>Complete each gate in order, from design reasoning through incident evidence and two independent repairs.</p></div>
             <ol>
@@ -261,9 +271,9 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, onC
           <div id="cloud-complete">{saveError && <p className="cloud-error" role="alert">{saveError}</p>}
           {completed ? (
             <div className="cloud-completion" role="status">
-              <h3>{daily ? "Daily Quest complete!" : lesson.id === CLOUD_PATH_TOTAL ? path.title + " complete!" : "Lesson verified"}</h3>
+              <h3>{daily ? "Daily Quest complete!" : lesson.id === lessonTotal ? path.title + " complete!" : "Lesson verified"}</h3>
               <p>{newlyCompleted ? "+" + rewardXp + " XP · Progress saved in this browser." : daily ? "Today’s reward is already claimed. Replay the scenario in any format for practice." : "Your completion is saved. Replay any time; XP is awarded once."}</p>
-              {daily ? <><p>A new deterministic Cloud challenge arrives at 00:00 UTC.</p><Link className="curriculum-next cloud-button" href={"/roadmap/cloud/" + paceId}>Return to {path.label} roadmap →</Link></> : lesson.id < CLOUD_PATH_TOTAL ? <Link className="curriculum-next cloud-button" href={lessonPath(paceId, lesson.id + 1)}>Next lesson →</Link> : <><p>You have completed {path.title}. This is a learning milestone, not a production-readiness certification.</p><Link className="curriculum-next cloud-button" href={"/roadmap/cloud/" + paceId}>View completed path →</Link></>}
+              {daily ? <><p>A new deterministic {trackShortLabel} challenge arrives at 00:00 UTC.</p><Link className="curriculum-next cloud-button" href={"/roadmap/" + trackKind + "/" + paceId}>Return to {path.label} roadmap →</Link></> : lesson.id < lessonTotal ? <Link className="curriculum-next cloud-button" href={lessonPath(trackKind, paceId, lesson.id + 1)}>Next lesson →</Link> : <><p>You have completed {path.title}. This is a learning milestone, not a production-readiness certification.</p><Link className="curriculum-next cloud-button" href={"/roadmap/" + trackKind + "/" + paceId}>View completed path →</Link></>}
             </div>
           ) : (
             <div className="cloud-complete-action">
@@ -271,11 +281,11 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, onC
               <p>{canComplete ? "All decision, evidence, artifact, and system checks passed. Save your completion." : "Finish all four gates: architecture decisions, evidence triage, static artifact review, and the Relay plan simulation."}</p>
             </div>
           )}
-          {lesson.id === CLOUD_PATH_TOTAL && result?.passed && artifactPassed && <button className="curriculum-next cloud-button cloud-button-secondary cloud-download" onClick={download}>Download verified review bundle ↓</button>}
+          {lesson.id === lessonTotal && result?.passed && artifactPassed && <button className="curriculum-next cloud-button cloud-button-secondary cloud-download" onClick={download}>Download verified review bundle ↓</button>}
           </div>
         </section>
       </div>
-      <footer className="cloud-lesson-footer">{daily ? <Link href={"/roadmap/cloud/" + paceId}>← Close Daily Quest</Link> : lesson.id > 1 ? <Link href={lessonPath(paceId, lesson.id - 1)}>← Previous lesson</Link> : <Link href="/tracks/cloud">← Cloud paths</Link>}<Link href={"/roadmap/cloud/" + paceId}>Back to roadmap</Link></footer>
+      <footer className="cloud-lesson-footer">{daily ? <Link href={"/roadmap/" + trackKind + "/" + paceId}>← Close Daily Quest</Link> : lesson.id > 1 ? <Link href={lessonPath(trackKind, paceId, lesson.id - 1)}>← Previous lesson</Link> : <Link href={"/tracks/" + trackKind}>← {trackShortLabel} paths</Link>}<Link href={"/roadmap/" + trackKind + "/" + paceId}>Back to roadmap</Link></footer>
     </>
   );
 }
