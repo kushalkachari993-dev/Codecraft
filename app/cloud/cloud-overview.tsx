@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+/* eslint-disable @next/next/no-html-link-for-pages -- Document navigation avoids the hosted router's broken lesson transitions. */
 import DailyQuestCard from "../components/daily-quest-card";
 import { getDailyQuestIndex } from "../daily-quest";
 import type { PlayerProgress } from "../progress";
@@ -76,7 +76,7 @@ export default function CloudOverview({ paceId, progress, ready }: {
                     const available = ready && isCloudLessonUnlocked(progress, lesson.id, paceId);
                     const done = completed.includes(lesson.id);
                     const label = <><span aria-hidden="true">{done ? "✓" : String(lesson.id).padStart(2, "0")}</span><span>{lesson.title}<small>{lesson.minutes} min · {done ? "Complete" : available ? "Ready" : "Locked"}</small></span></>;
-                    return <li key={lesson.id} className={done ? "done" : available ? "available" : "locked"}>{available ? <Link href={lessonPath(paceId, lesson.id)}>{label}</Link> : <div>{label}</div>}</li>;
+                    return <li key={lesson.id} className={done ? "done" : available ? "available" : "locked"}>{available ? <a href={lessonPath(paceId, lesson.id)}>{label}</a> : <div>{label}</div>}</li>;
                   })}
                 </ol>
                 <div className="pace-card-progress"><div role="progressbar" aria-label={world.name + " progress"} aria-valuemin={0} aria-valuemax={lessons.length} aria-valuenow={count}><i style={{ width: count / lessons.length * 100 + "%" }} /></div><span>{count}/{lessons.length} complete</span></div>
@@ -90,7 +90,7 @@ export default function CloudOverview({ paceId, progress, ready }: {
         {pathMissions[paceId].map((mission, index) => <article key={mission.label}><span>{String(index + 1).padStart(2, "0")}</span><div><small>{mission.label}</small><strong>{mission.title}</strong><p>{mission.detail}</p></div></article>)}
       </div>
       <div className="pace-picker-note cloud-path-note"><span>◇</span><p><strong>Simulation-only labs · No cloud account required</strong>Practice with fictional JSON relay plans. The capstone models a deployment; no real infrastructure is created.</p></div>
-      <div className="cloud-path-links"><Link href="/tracks/cloud">Choose another Cloud path →</Link><Link href="/tracks/python">Python track →</Link><span>{path.title} · Guest progress saves in this browser</span></div>
+      <div className="cloud-path-links"><a href="/tracks/cloud">Choose another Cloud path →</a><a href="/tracks/python">Python track →</a><span>{path.title} · Guest progress saves in this browser</span></div>
     </section>
   );
 }

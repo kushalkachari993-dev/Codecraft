@@ -99,8 +99,6 @@ const EXPERT: TopicSpec[] = [
   topic("Architecture Review Capstone", "Defend and troubleshoot a complete system through trade-offs, evidence, incidents, and evolution plans.", "users-platform-data-operations", "a polished diagram omits ownership, failure behavior, and verification", "verified_architecture_risks", ["decision-record", "incident-simulation", "fitness-functions"], "sre"),
 ];
 
-const byPace: Record<BackendPaceId, TopicSpec[]> = { beginner: BEGINNER, intermediate: INTERMEDIATE, expert: EXPERT };
-
 function buildLesson(spec: TopicSpec, id: number, paceId: BackendPaceId): CloudLesson {
   const timeout = 250 + ((id + (paceId === "expert" ? 2 : paceId === "intermediate" ? 1 : 0)) % 5) * 150;
   const retryLimit = spec.failure.includes("retry") || spec.title.includes("Queue") || spec.title.includes("Outbox") ? 2 : 1;
@@ -128,18 +126,18 @@ function buildLesson(spec: TopicSpec, id: number, paceId: BackendPaceId): CloudL
     story: `The ${spec.boundary} relay is producing ${spec.metric} evidence, but its failure contract is incomplete. Make the boundary, risk, and recovery behavior explicit before Byte restores traffic.`,
     concepts: [
       { title: "Name the contract", body: `${spec.goal} Treat ${spec.boundary} as a real ownership boundary: define inputs, outputs, deadlines, allowed failures, and the party responsible for recovery.` },
-      { title: "Design for the failure", body: `The primary scenario is ${spec.failure}. Use ${spec.controls.join(", ")} as independent controls; one passing control never proves the whole user journey is safe.` },
+      { title: "Design for the failure", body: `Plan for this failure: ${spec.failure}. Use ${spec.controls.join(", ")} as independent controls; one passing control never proves the whole user journey is safe.` },
       { title: "Verify with evidence", body: `Measure ${spec.metric}, preserve a correlation path, and compare normal, degraded, and recovery behavior. A design claim becomes credible only when an observable test can falsify it.` },
     ],
     example: JSON.stringify(solution, null, 2),
-    exampleNote: `This review contract gives ${spec.boundary} a bounded ${timeout} ms deadline, at most ${retryLimit} retry${retryLimit === 1 ? "" : "s"}, stable operation identity, and three topic-specific safeguards.`,
+    exampleNote: `This review contract gives ${spec.boundary} a bounded ${timeout} ms deadline, at most ${retryLimit} ${retryLimit === 1 ? "retry" : "retries"}, stable operation identity, and three topic-specific safeguards.`,
     mistake: `Do not treat “${spec.failure}” as an implementation detail. If the architecture does not name the failure, callers invent incompatible timeout, retry, and recovery behavior.`,
     mission: `Repair the ${spec.boundary} contract, investigate the ${spec.metric} evidence, and statically review a realistic backend artifact.`,
     fields: [
       field("boundary", "string", `Exact ownership path for this lesson: ${spec.boundary}.`),
       field("failure_mode", "string", `The scenario the design must handle: ${spec.failure}.`),
       field("timeout_ms", "number", `A bounded ${timeout} ms deadline for the simulated operation.`),
-      field("retry_limit", "number", `At most ${retryLimit} controlled retry${retryLimit === 1 ? "" : "s"}; never multiply retries across layers.`),
+      field("retry_limit", "number", `At most ${retryLimit} controlled ${retryLimit === 1 ? "retry" : "retries"}; never multiply retries across layers.`),
       field("idempotent", "boolean", "Whether the operation can safely observe the same request or message again."),
       field("safeguards", "strings", `The three required controls: ${spec.controls.join(", ")}.`),
     ],

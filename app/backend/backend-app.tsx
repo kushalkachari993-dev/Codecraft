@@ -1,7 +1,7 @@
 "use client";
 
 import { SignInButton, useAuth, useUser } from "@clerk/react";
-import Link from "next/link";
+/* eslint-disable @next/next/no-html-link-for-pages -- Document navigation avoids the hosted router's broken lesson transitions. */
 import { useEffect, useState } from "react";
 import CloudLab from "../cloud/cloud-lab";
 import { DAILY_QUEST_XP, getDailyQuestIndex } from "../daily-quest";
@@ -92,8 +92,8 @@ export default function BackendApp({ paceId = "beginner", lessonId, roadmap = fa
             <div className="lesson-progress" role="progressbar" aria-label={daily ? "Daily Quest completion" : path.title + " progress"} aria-valuemin={0} aria-valuemax={daily ? 1 : BACKEND_PATH_TOTAL} aria-valuenow={daily ? dailyCompleted ? 1 : 0 : completed.length}><i style={{ width: daily ? dailyCompleted ? "100%" : "50%" : completed.length / BACKEND_PATH_TOTAL * 100 + "%" }} /></div>
             <span>{daily ? "UTC · +" + DAILY_QUEST_XP + " XP" : lesson ? lesson.id + "/" + BACKEND_PATH_TOTAL + " · " + backendLessonXp(lesson.id, paceId) + " XP" : BACKEND_PATH_TOTAL + " LESSONS"}</span>
           </div>
-          {!lesson ? <div className="cloud-gate"><h1>Lesson not found</h1><Link href="/tracks/backend">Explore Backend Engineering paths →</Link></div> : !ready ? <p className="view-loading" role="status">Loading your local learning progress…</p> : !unlocked ? (
-            <section className="cloud-gate"><h1>This lesson is locked</h1><p>Complete lesson {nextId}, including its simulation, to continue in order.</p><Link className="curriculum-next cloud-button" href={backendLessonPath(paceId, nextId)}>Continue lesson {nextId} →</Link></section>
+          {!lesson ? <div className="cloud-gate"><h1>Lesson not found</h1><a href="/tracks/backend">Explore Backend Engineering paths →</a></div> : !ready ? <p className="view-loading" role="status">Loading your local learning progress…</p> : !unlocked ? (
+            <section className="cloud-gate"><h1>This lesson is locked</h1><p>Complete lesson {nextId}, including its simulation, to continue in order.</p><a className="curriculum-next cloud-button" href={backendLessonPath(paceId, nextId)}>Continue lesson {nextId} →</a></section>
           ) : <>{daily && <section className={"daily-quest-brief " + (dailyCompleted ? "complete" : "")}><div className="daily-quest-emblem" aria-hidden="true">☼<span>DQ</span></div><div><p>TODAY&apos;S BACKEND RELAY CHALLENGE</p><h1>{lesson.title}</h1><span>Pass the architecture checkpoint, investigate the evidence, and repair both static backend artifacts.</span><div><b>Backend Engineering</b><b>{path.label}</b><b>15–25 min</b></div></div><aside><small>REWARD</small><strong>+{DAILY_QUEST_XP} XP</strong><span>{progress.game.dailyQuestStreak} day streak</span><i>{dailyCompleted ? "REWARD CLAIMED" : "AVAILABLE TODAY"}</i></aside></section>}<CloudLab key={(daily ? "daily-" : "") + "backend-" + paceId + "-" + lesson.id} trackKind="backend" paceId={paceId} lesson={lesson} completed={daily ? dailyCompleted : completed.includes(lesson.id)} daily={daily} onComplete={saveCompletion} /></>}
         </section>
       ) : roadmap ? <BackendOverview paceId={paceId} progress={progress} ready={ready} /> : <BackendPacePicker progress={progress} ready={ready} recommendation={paceRecommendation} onRecommend={setPaceRecommendation} onSelect={selectPace} />}

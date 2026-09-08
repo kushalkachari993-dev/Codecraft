@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+/* eslint-disable @next/next/no-html-link-for-pages -- Document navigation avoids the hosted router's broken lesson transitions. */
 import DailyQuestCard from "../components/daily-quest-card";
 import { getDailyQuestIndex } from "../daily-quest";
 import type { PlayerProgress } from "../progress";
@@ -74,7 +74,7 @@ export default function BackendOverview({ paceId, progress, ready }: { paceId: B
                     const available = ready && isBackendLessonUnlocked(progress, lesson.id, paceId);
                     const done = completed.includes(lesson.id);
                     const label = <><span aria-hidden="true">{done ? "✓" : String(lesson.id).padStart(2, "0")}</span><span>{lesson.title}<small>{lesson.minutes} min · {done ? "Complete" : available ? "Ready" : "Locked"}</small></span></>;
-                    return <li key={lesson.id} className={done ? "done" : available ? "available" : "locked"}>{available ? <Link href={lessonPath(paceId, lesson.id)}>{label}</Link> : <div>{label}</div>}</li>;
+                    return <li key={lesson.id} className={done ? "done" : available ? "available" : "locked"}>{available ? <a href={lessonPath(paceId, lesson.id)}>{label}</a> : <div>{label}</div>}</li>;
                   })}
                 </ol>
                 <div className="pace-card-progress"><div role="progressbar" aria-label={world.name + " progress"} aria-valuemin={0} aria-valuemax={lessons.length} aria-valuenow={count}><i style={{ width: count / lessons.length * 100 + "%" }} /></div><span>{count}/{lessons.length} complete</span></div>
@@ -88,7 +88,7 @@ export default function BackendOverview({ paceId, progress, ready }: { paceId: B
         {pathMissions[paceId].map((mission, index) => <article key={mission.label}><span>{String(index + 1).padStart(2, "0")}</span><div><small>{mission.label}</small><strong>{mission.title}</strong><p>{mission.detail}</p></div></article>)}
       </div>
       <div className="pace-picker-note cloud-path-note"><span>◇</span><p><strong>Simulation-only labs · No backend platform required</strong>Practice with fictional service plans, OpenAPI contracts, migrations, event schemas, logs, traces, and incident timelines. Nothing is executed against a live system.</p></div>
-      <div className="cloud-path-links"><Link href="/tracks/backend">Choose another Backend path →</Link><Link href="/tracks/cloud">Cloud Engineering track →</Link><span>{path.title} · Guest progress saves in this browser</span></div>
+      <div className="cloud-path-links"><a href="/tracks/backend">Choose another Backend path →</a><a href="/tracks/cloud">Cloud Engineering track →</a><span>{path.title} · Guest progress saves in this browser</span></div>
     </section>
   );
 }

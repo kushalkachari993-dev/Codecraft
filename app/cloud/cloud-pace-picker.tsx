@@ -23,7 +23,7 @@ export default function CloudPacePicker({ progress, ready, recommendation, onRec
       <div className="pace-picker-hero">
         <button onClick={() => window.location.assign("/tracks")}>← All tracks</button>
         <p className="pixel-kicker">CLOUD ENGINEERING TRAIL · CHOOSE YOUR PATH</p>
-        <h1>Choose your<br /><span>Cloud Engineering pace</span></h1>
+        <h1>Choose your <br /><span>Cloud Engineering pace</span></h1>
         <p>Start where you are. Each level has 21 interactive topics across four worlds, and progress is saved separately for every path.</p>
       </div>
       <section className="pace-recommender" aria-labelledby="cloud-pace-recommender-title">

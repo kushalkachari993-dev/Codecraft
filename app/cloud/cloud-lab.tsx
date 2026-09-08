@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+// Document navigation avoids the hosted router's broken lesson transitions.
 import { DAILY_QUEST_XP } from "../daily-quest";
 import { evaluateBackendArtifact, getBackendArtifact } from "../backend/artifacts";
 import { getBackendCheckpoints } from "../backend/checkpoints";
@@ -273,7 +273,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
             <div className="cloud-completion" role="status">
               <h3>{daily ? "Daily Quest complete!" : lesson.id === lessonTotal ? path.title + " complete!" : "Lesson verified"}</h3>
               <p>{newlyCompleted ? "+" + rewardXp + " XP · Progress saved in this browser." : daily ? "Today’s reward is already claimed. Replay the scenario in any format for practice." : "Your completion is saved. Replay any time; XP is awarded once."}</p>
-              {daily ? <><p>A new deterministic {trackShortLabel} challenge arrives at 00:00 UTC.</p><Link className="curriculum-next cloud-button" href={"/roadmap/" + trackKind + "/" + paceId}>Return to {path.label} roadmap →</Link></> : lesson.id < lessonTotal ? <Link className="curriculum-next cloud-button" href={lessonPath(trackKind, paceId, lesson.id + 1)}>Next lesson →</Link> : <><p>You have completed {path.title}. This is a learning milestone, not a production-readiness certification.</p><Link className="curriculum-next cloud-button" href={"/roadmap/" + trackKind + "/" + paceId}>View completed path →</Link></>}
+              {daily ? <><p>A new deterministic {trackShortLabel} challenge arrives at 00:00 UTC.</p><a className="curriculum-next cloud-button" href={"/roadmap/" + trackKind + "/" + paceId}>Return to {path.label} roadmap →</a></> : lesson.id < lessonTotal ? <a className="curriculum-next cloud-button" href={lessonPath(trackKind, paceId, lesson.id + 1)}>Next lesson →</a> : <><p>You have completed {path.title}. This is a learning milestone, not a production-readiness certification.</p><a className="curriculum-next cloud-button" href={"/roadmap/" + trackKind + "/" + paceId}>View completed path →</a></>}
             </div>
           ) : (
             <div className="cloud-complete-action">
@@ -285,7 +285,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
           </div>
         </section>
       </div>
-      <footer className="cloud-lesson-footer">{daily ? <Link href={"/roadmap/" + trackKind + "/" + paceId}>← Close Daily Quest</Link> : lesson.id > 1 ? <Link href={lessonPath(trackKind, paceId, lesson.id - 1)}>← Previous lesson</Link> : <Link href={"/tracks/" + trackKind}>← {trackShortLabel} paths</Link>}<Link href={"/roadmap/" + trackKind + "/" + paceId}>Back to roadmap</Link></footer>
+      <footer className="cloud-lesson-footer">{daily ? <a href={"/roadmap/" + trackKind + "/" + paceId}>← Close Daily Quest</a> : lesson.id > 1 ? <a href={lessonPath(trackKind, paceId, lesson.id - 1)}>← Previous lesson</a> : <a href={"/tracks/" + trackKind}>← {trackShortLabel} paths</a>}<a href={"/roadmap/" + trackKind + "/" + paceId}>Back to roadmap</a></footer>
     </>
   );
 }

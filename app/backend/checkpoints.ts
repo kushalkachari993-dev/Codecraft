@@ -27,7 +27,7 @@ export function getBackendCheckpoints(paceId: BackendPaceId, lesson: CloudLesson
       explanation: `The design names ${failure} as a first-class scenario. ${safeguards[0]} and correlated evidence keep the response bounded and reviewable.`,
     },
     {
-      question: `During a ${lesson.title} traffic spike, the operation has a ${timeout} ms deadline and ${retries} retry${retries === 1 ? "" : "s"}. What is the safest change?`,
+      question: `During a ${lesson.title} traffic spike, the operation has a ${timeout} ms deadline and ${retries} ${retries === 1 ? "retry" : "retries"}. What is the safest change?`,
       correct: "Preserve one end-to-end deadline, retry only safe operations within its remaining budget, and shed excess work deliberately.",
       wrongA: "Give each layer a fresh deadline and retry count so all dependencies get a full chance.",
       wrongB: "Remove the deadline; waiting is safer than returning an explicit overload response.",
