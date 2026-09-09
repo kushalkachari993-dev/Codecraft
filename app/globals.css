@@ -1,5 +1,40 @@
 @import "tailwindcss";
 
+/* Returning learners and audited worked scenarios share the existing palette. */
+.returning-learning { max-width: 1180px; margin: 0 auto 32px; padding: 24px; border: 2px solid var(--cyan); background: var(--panel); box-shadow: 5px 5px 0 var(--shadow); overflow-wrap: anywhere; }
+.returning-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.returning-heading h2 { margin: 8px 0; font-size: 24px; }
+.returning-heading p, .returning-skills p, .returning-reviews > p { color: var(--muted); line-height: 1.6; }
+.returning-learning a { color: var(--cyan); text-underline-offset: 4px; }
+.returning-heading .curriculum-next { flex-shrink: 0; display: inline-flex; align-items: center; min-height: 44px; color: var(--night); text-decoration: none; }
+.returning-skills, .returning-reviews { padding-top: 18px; margin-top: 20px; border-top: 1px solid var(--line); }
+.returning-skills h3, .returning-reviews h3 { margin: 0; font-size: 18px; }
+.returning-skills ul { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; padding: 0; }
+.returning-skills li { padding: 8px 12px; border: 1px solid var(--line); color: var(--lime); }
+.returning-note { font-size: var(--type-body-compact); }
+.return-review-card { margin-top: 16px; padding: 18px; background: var(--night); border: 1px solid var(--line); }
+.return-review-card fieldset { min-width: 0; border: 0; padding: 0; margin: 14px 0; }
+.return-review-card legend { font-weight: 750; line-height: 1.6; margin-bottom: 12px; }
+.return-review-card label { display: flex; gap: 12px; align-items: flex-start; padding: 12px; margin-top: 8px; min-height: 44px; border: 1px solid var(--line); cursor: pointer; line-height: 1.5; }
+.return-review-card input { flex-shrink: 0; margin-top: 5px; accent-color: var(--cyan); }
+.return-review-card button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--cyan); background: var(--panel-2); }
+.return-review-card button:disabled { opacity: .5; cursor: not-allowed; }
+.return-review-card [role="status"] { color: var(--yellow); line-height: 1.6; }
+.lesson-depth-panel { min-width: 0; margin: 24px 0; padding: 22px; background: var(--panel-2); border-left: 3px solid var(--cyan); overflow-wrap: anywhere; }
+.lesson-depth-panel h2 { margin: 8px 0 16px; font-size: 22px; }
+.lesson-depth-panel h3 { font-size: 18px; }
+.lesson-depth-panel p { line-height: 1.7; font-size: var(--type-body-large); }
+.lesson-depth-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px; background: var(--night); font-size: var(--type-body-compact); line-height: 1.7; }
+.lesson-depth-panel a { color: var(--cyan); display: inline-block; min-height: 44px; padding-top: 10px; text-underline-offset: 4px; }
+.returning-learning a:focus-visible, .lesson-depth-panel a:focus-visible, .return-review-card label:focus-within { outline: 3px solid var(--yellow); outline-offset: 3px; }
+@media (max-width: 680px) {
+  .returning-learning { padding: 18px; }
+  .returning-heading { align-items: stretch; flex-direction: column; gap: 12px; }
+  .returning-heading .curriculum-next { justify-content: center; }
+  .return-review-card, .lesson-depth-panel { padding: 14px; }
+}
+
+
 :root {
   --night: #02080d;
   --panel: #07141b;

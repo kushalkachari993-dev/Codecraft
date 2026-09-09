@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { GENAI_PACES } from "../genai-curriculum";
 import type { JourneyPaceId, JourneyPreferences, JourneyTrackId } from "../hooks/use-journey";
 import { PYTHON_PACES } from "../python-curriculum";
@@ -7,6 +8,7 @@ import type { PlayerProgress } from "../progress";
 import { SQL_PACES } from "../sql-curriculum";
 import { FirstRunChecklist, PACE_MATCH, TRACK_MATCH, TRACKS, type Track } from "../codecraft-catalog";
 import DailyQuestCard from "./daily-quest-card";
+import ReturningLearning from "./returning-learning";
 import CloudTrackCard from "./cloud-track-card";
 import BackendTrackCard from "./backend-track-card";
 
@@ -20,27 +22,25 @@ type Pace = {
   topics: Array<{ title: string }>;
 };
 
-export function TrackPickerView({ journey, totalBadges, savedTrackLabel, savedPaceLabel, dailyQuest, progress, recommendation, cloudUser, onResume, onRecommend, onSelectTrack }: {
+export function TrackPickerView({ journey, totalBadges, dailyQuest, progress, recommendation, cloudUser, onResume, onRecommend, onSelectTrack }: {
   journey: JourneyPreferences;
   totalBadges: number;
-  savedTrackLabel: string;
-  savedPaceLabel: string;
   dailyQuest: { completed: boolean; title: string; trackLabel: string; paceLabel: string; streak: number; onOpen: () => void };
   progress: PlayerProgress;
   recommendation: JourneyTrackId;
   cloudUser: { displayName: string } | null;
-  onResume: () => void;
+  onResume: (visit: Pick<JourneyPreferences, "trackId" | "paceId">) => void;
   onRecommend: (trackId: JourneyTrackId) => void;
   onSelectTrack: (track: Track) => void;
 }) {
   return (
     <section className="track-picker">
+      <ReturningLearning progress={progress} journey={journey} onResume={onResume} />
       <div className="track-picker-hero">
         <p className="pixel-kicker">ORIGINAL CODE REALMS · CHOOSE YOUR MISSION</p>
         <h1>Repair the Core Relay.<br /><span>Master real code.</span></h1>
         <p>The Code Realms have fallen out of sync. Join Byte, restore their systems one concept at a time, and turn knowledge into power.</p>
       </div>
-      {(journey.started || totalBadges > 0) && <section className="journey-resume"><div><span>CONTINUE YOUR JOURNEY</span><h2>{journey.started ? `${savedTrackLabel} / ${savedPaceLabel}` : "Return to your most active path"}</h2><p>Your next unlocked topic, world project, and rewards are waiting.</p></div><button onClick={onResume}>Continue where I left off</button></section>}
       <DailyQuestCard {...dailyQuest} />
       {totalBadges === 0 && <FirstRunChecklist activeStep={0} />}
       <section className="track-recommender" aria-labelledby="track-recommender-title">
@@ -93,6 +93,11 @@ export function PacePickerView({ track, paces, progress, totalBadges, recommenda
   onRecommend: (paceId: JourneyPaceId) => void;
   onSelect: (paceId: JourneyPaceId) => void;
 }) {
+  const [interactive, setInteractive] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setInteractive(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   return (
     <section className={`python-pace-picker ${track.id}-pace-picker`}>
       <div className="pace-picker-hero"><button onClick={onBack}>← All tracks</button><p className="pixel-kicker">{track.label.toUpperCase()} TRAIL · CHOOSE YOUR PATH</p><h1>Choose your<br /><span>{track.label} pace</span></h1><p>Start where you are. You can switch paths at any time, and progress is saved separately for every level.</p></div>
@@ -102,7 +107,7 @@ export function PacePickerView({ track, paces, progress, totalBadges, recommenda
         {paces.map((pace, index) => {
           const completed = progress.completed[`${track.id}-${pace.id}`]?.length ?? 0;
           const percent = Math.round((completed / pace.topics.length) * 100);
-          return <article className={`pace-card ${pace.id} ${recommendation === pace.id ? "recommended" : ""}`} key={pace.id}><div className="pace-card-art" aria-hidden="true"><span>{index + 1}</span><i /><i /><b>{pace.estimatedLevel}</b></div><div className="pace-card-body"><div className={"recommendation-badge " + (recommendation === pace.id ? "" : "recommendation-placeholder")} aria-hidden={recommendation !== pace.id}>RECOMMENDED START</div><div className="pace-tier"><span>PATH {String(index + 1).padStart(2, "0")}</span><small>{pace.topics.length} TOPICS</small></div><h2>{pace.label}</h2><strong>{pace.tagline}</strong><p>{pace.description}</p><div className="pace-for"><small>RECOMMENDED FOR</small><span>{pace.recommendedFor}</span></div><div className="pace-topic-preview">{pace.topics.slice(0, 5).map((topic) => <span key={topic.title}>{topic.title}</span>)}<span>+{pace.topics.length - 5} more</span></div><div className="pace-card-progress"><div><i style={{ width: `${percent}%` }} /></div><span>{completed}/{pace.topics.length} complete</span></div><button className="pace-card-cta" onClick={() => onSelect(pace.id)}>{completed ? `Continue ${pace.label}` : `Start ${pace.label}`} →</button></div></article>;
+          return <article className={`pace-card ${pace.id} ${recommendation === pace.id ? "recommended" : ""}`} key={pace.id}><div className="pace-card-art" aria-hidden="true"><span>{index + 1}</span><i /><i /><b>{pace.estimatedLevel}</b></div><div className="pace-card-body"><div className={"recommendation-badge " + (recommendation === pace.id ? "" : "recommendation-placeholder")} aria-hidden={recommendation !== pace.id}>RECOMMENDED START</div><div className="pace-tier"><span>PATH {String(index + 1).padStart(2, "0")}</span><small>{pace.topics.length} TOPICS</small></div><h2>{pace.label}</h2><strong>{pace.tagline}</strong><p>{pace.description}</p><div className="pace-for"><small>RECOMMENDED FOR</small><span>{pace.recommendedFor}</span></div><div className="pace-topic-preview">{pace.topics.slice(0, 5).map((topic) => <span key={topic.title}>{topic.title}</span>)}<span>+{pace.topics.length - 5} more</span></div><div className="pace-card-progress"><div><i style={{ width: `${percent}%` }} /></div><span>{completed}/{pace.topics.length} complete</span></div><button className="pace-card-cta" disabled={!interactive} onClick={() => onSelect(pace.id)}>{completed ? `Continue ${pace.label}` : `Start ${pace.label}`} →</button></div></article>;
         })}
       </div>
       <div className="pace-picker-note"><span>◇</span><p><strong>Not sure where to begin?</strong>Start with Beginner. Completing one path is not required before exploring another.</p></div>

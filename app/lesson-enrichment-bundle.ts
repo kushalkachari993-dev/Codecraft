@@ -1,4 +1,5 @@
 import { getLessonEnrichment, type LearningTrackId, type LessonEnrichment } from "./authored-lessons";
+import { getLessonDepth } from "./lesson-depth";
 import { getRoundTwoLessonEnrichment } from "./authored-lessons-round2";
 import { getRoundThreeLessonEnrichment } from "./authored-lessons-round3";
 import { getRoundFourLessonEnrichment } from "./authored-lessons-round4";
@@ -17,7 +18,8 @@ import { getRoundSixteenLessonEnrichment } from "./authored-lessons-round16";
 import { getRoundSeventeenLessonEnrichment } from "./authored-lessons-round17";
 
 export function getAuthoredLessonEnrichment(trackId: LearningTrackId, paceId: string, title: string): LessonEnrichment | undefined {
-  return getLessonEnrichment(trackId, paceId, title)
+  const depth = getLessonDepth(trackId, paceId, title);
+  const existing = getLessonEnrichment(trackId, paceId, title)
     ?? getRoundTwoLessonEnrichment(trackId, paceId, title)
     ?? getRoundThreeLessonEnrichment(trackId, paceId, title)
     ?? getRoundFourLessonEnrichment(trackId, paceId, title)
@@ -34,4 +36,10 @@ export function getAuthoredLessonEnrichment(trackId: LearningTrackId, paceId: st
     ?? getRoundFifteenLessonEnrichment(trackId, paceId, title)
     ?? getRoundSixteenLessonEnrichment(trackId, paceId, title)
     ?? getRoundSeventeenLessonEnrichment(trackId, paceId, title);
+  if (!depth) return existing;
+  return {
+    whyItMatters: existing?.whyItMatters ?? depth.explanation,
+    walkthrough: [...(existing?.walkthrough ?? []), { title: "Explain the worked scenario", body: depth.reasoning }],
+    quiz: depth.questions,
+  };
 }

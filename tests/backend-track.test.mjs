@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, access } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -7,6 +7,11 @@ import { createElement } from "react";
 
 const root = new URL("../", import.meta.url);
 const modules = new Map();
+async function resolveLocal(specifier, parent) {
+  if (/\.tsx?$/.test(specifier)) return new URL(specifier, parent);
+  const path = new URL(specifier + ".ts", parent);
+  try { await access(path); return path; } catch { return new URL(specifier + ".tsx", parent); }
+}
 
 async function loadModule(path) {
   const file = new URL(path, root);
@@ -25,7 +30,7 @@ async function loadModule(path) {
       const target = specifier === "next/link"
         ? "data:text/javascript," + encodeURIComponent("import{createElement}from" + JSON.stringify(import.meta.resolve("react")) + ";export default function Link({href,children,...props}){return createElement('a',{href,...props},children)}")
         : specifier.startsWith(".")
-          ? await moduleUrl(new URL(specifier + (/\.tsx?$/.test(specifier) ? "" : ".ts"), url))
+          ? await moduleUrl(await resolveLocal(specifier, url))
           : import.meta.resolve(specifier);
       output = output.replace(match[0], "from " + JSON.stringify(target));
     }

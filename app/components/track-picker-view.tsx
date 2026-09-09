@@ -4,6 +4,7 @@ import type { JourneyPreferences, JourneyTrackId } from "../hooks/use-journey";
 import type { PlayerProgress } from "../progress";
 import { TRACK_MATCH, TRACK_TOPIC_TOTALS, TRACKS, type Track } from "../track-catalog";
 import DailyQuestCard from "./daily-quest-card";
+import ReturningLearning from "./returning-learning";
 import CloudTrackCard from "./cloud-track-card";
 import BackendTrackCard from "./backend-track-card";
 
@@ -16,27 +17,25 @@ function FirstRunChecklist({ activeStep }: { activeStep: number }) {
   );
 }
 
-export default function TrackPickerView({ journey, totalBadges, savedTrackLabel, savedPaceLabel, dailyQuest, progress, recommendation, cloudUser, onResume, onRecommend, onSelectTrack }: {
+export default function TrackPickerView({ journey, totalBadges, dailyQuest, progress, recommendation, cloudUser, onResume, onRecommend, onSelectTrack }: {
   journey: JourneyPreferences;
   totalBadges: number;
-  savedTrackLabel: string;
-  savedPaceLabel: string;
   dailyQuest: { completed: boolean; title: string; trackLabel: string; paceLabel: string; streak: number; onOpen: () => void };
   progress: PlayerProgress;
   recommendation: JourneyTrackId;
   cloudUser: { displayName: string } | null;
-  onResume: () => void;
+  onResume: (visit: Pick<JourneyPreferences, "trackId" | "paceId">) => void;
   onRecommend: (trackId: JourneyTrackId) => void;
   onSelectTrack: (track: Track) => void;
 }) {
   return (
     <section className="track-picker">
+      <ReturningLearning progress={progress} journey={journey} onResume={onResume} />
       <div className="track-picker-hero">
         <p className="pixel-kicker">ORIGINAL CODE REALMS · CHOOSE YOUR MISSION</p>
         <h1>Repair the Core Relay.<br /><span>Master real code.</span></h1>
         <p>The Code Realms have fallen out of sync. Join Byte, restore their systems one concept at a time, and turn knowledge into power.</p>
       </div>
-      {(journey.started || totalBadges > 0) && <section className="journey-resume"><div><span>CONTINUE YOUR JOURNEY</span><h2>{journey.started ? `${savedTrackLabel} / ${savedPaceLabel}` : "Return to your most active path"}</h2><p>Your next unlocked topic, world project, and rewards are waiting.</p></div><button onClick={onResume}>Continue where I left off</button></section>}
       <DailyQuestCard {...dailyQuest} />
       {totalBadges === 0 && <FirstRunChecklist activeStep={0} />}
       <section className="track-recommender" aria-labelledby="track-recommender-title">

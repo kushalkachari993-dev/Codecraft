@@ -1,4 +1,5 @@
 import type { CloudCheckpoint } from "../cloud/checkpoints";
+import { getLessonDepth } from "../lesson-depth";
 import type { CloudLesson } from "../cloud/model";
 import type { BackendPaceId } from "./track";
 
@@ -12,6 +13,8 @@ function rotate(seed: Seed, offset: number): CloudCheckpoint {
 }
 
 export function getBackendCheckpoints(paceId: BackendPaceId, lesson: CloudLesson): CloudCheckpoint[] {
+  const audited = getLessonDepth("backend", paceId, lesson.title);
+  if (audited) return audited.questions.map(q => ({ ...q, options: [q.options[0], q.options[1], q.options[2]] }));
   const boundary = String(lesson.solution.boundary);
   const failure = String(lesson.solution.failure_mode);
   const timeout = Number(lesson.solution.timeout_ms);

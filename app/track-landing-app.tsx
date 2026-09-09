@@ -8,9 +8,9 @@ import { useJourney, type JourneyPaceId, type JourneyPreferences, type JourneyTr
 import { useProgressSync } from "./hooks/use-progress-sync";
 import { learningPathForRoute, parseLearningLocation } from "./navigation";
 import { TRACKS, type Track } from "./track-catalog";
-import { CLOUD_PATH_TOTAL, getCloudPath } from "./cloud/track";
+import { CLOUD_PATH_TOTAL } from "./cloud/track";
 import { getCloudLessons } from "./cloud/catalog";
-import { BACKEND_PATH_TOTAL, getBackendPath } from "./backend/track";
+import { BACKEND_PATH_TOTAL } from "./backend/track";
 import { getBackendLessons } from "./backend/curriculum";
 import { getDailyQuestIndex } from "./daily-quest";
 
@@ -31,7 +31,6 @@ export default function TrackLandingApp() {
   });
   const { journey, persistJourney, goalRecommendation, setGoalRecommendation, paceRecommendation } = useJourney(() => undefined);
   const totalBadges = Object.values(progress.completed).reduce((total, ids) => total + ids.length, 0);
-  const savedTrack = TRACKS.find((track) => track.id === journey.trackId) ?? TRACKS[0];
 
   useEffect(() => {
     const current = window.location.pathname + window.location.search;
@@ -111,8 +110,6 @@ export default function TrackLandingApp() {
       <TrackPickerView
         journey={journey}
         totalBadges={totalBadges}
-        savedTrackLabel={journey.trackId === "cloud" ? "Cloud Engineering" : journey.trackId === "backend" ? "Backend Engineering" : savedTrack.label}
-        savedPaceLabel={journey.trackId === "cloud" ? getCloudPath(journey.paceId).title : journey.trackId === "backend" ? getBackendPath(journey.paceId).title : paceLabel(journey.paceId)}
         dailyQuest={{
           completed: dailyCompleted,
           title: cloudDailyLesson?.title ?? backendDailyLesson?.title ?? "Today’s Relay Challenge",
@@ -124,7 +121,7 @@ export default function TrackLandingApp() {
         progress={progress}
         recommendation={goalRecommendation}
         cloudUser={cloudUser}
-        onResume={resumeJourney}
+        onResume={(destination) => persistJourney({ ...destination, started: true, tutorialComplete: true })}
         onRecommend={setGoalRecommendation}
         onSelectTrack={selectTrack}
       />

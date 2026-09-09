@@ -21,9 +21,9 @@ test("guides a first learner from recommendation to first lesson", async () => {
 });
 
 test("supports returning learners and explains the game economy", async () => {
-  const page = (await Promise.all([read("app/learning-app.tsx"), read("app/codecraft-catalog.tsx"), read("app/components/journey-views.tsx"), read("app/hooks/use-journey.ts")])).join("\n");
+  const page = (await Promise.all([read("app/learning-app.tsx"), read("app/codecraft-catalog.tsx"), read("app/components/journey-views.tsx"), read("app/components/returning-learning.tsx"), read("app/hooks/use-journey.ts")])).join("\n");
   assert.match(page, /CONTINUE YOUR JOURNEY/);
-  assert.match(page, /Continue where I left off/);
+  assert.match(page, /Continue learning/);
   assert.match(page, /resumeJourney/);
   assert.match(page, /Grow your level/);
   assert.match(page, /Prove each topic/);

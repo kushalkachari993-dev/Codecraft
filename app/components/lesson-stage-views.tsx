@@ -1,6 +1,7 @@
 "use client";
 
 import type { KeyboardEvent } from "react";
+import LessonDepthPanel from "./lesson-depth-panel";
 import type { ExecutionResult } from "../execution/types";
 import type { RunState, RuntimeReadiness } from "../hooks/use-lab-runtime";
 
@@ -50,7 +51,9 @@ export type ChallengeView = {
   };
 };
 
-export function TheoryLessonView({ quest, theory, enrichment, trackIcon, requiredProject, genAILab, onContinue }: {
+export function TheoryLessonView({ quest, theory, enrichment, trackIcon, trackId, paceId, requiredProject, genAILab, onContinue }: {
+  trackId?: string;
+  paceId?: string;
   quest: LessonQuest;
   theory: LessonTheory;
   enrichment: LessonEnrichmentView | null;
@@ -65,6 +68,7 @@ export function TheoryLessonView({ quest, theory, enrichment, trackIcon, require
         <p className="pixel-kicker">STEP 1 · LEARN THE IDEA</p>
         <h1>{quest.concept}</h1>
         <p className="learning-lead">{theory.overview}</p>
+        {trackId && paceId && <LessonDepthPanel trackId={trackId} paceId={paceId} title={quest.concept} />}
         <div className="theory-foundation">
           <span>CORE EXPLANATION</span>
           <p>{theory.deeper}</p>

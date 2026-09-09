@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import LessonDepthPanel from "../components/lesson-depth-panel";
+import { recordMissedQuestion } from "../learning-memory";
+import { useLearningVisit } from "../hooks/use-learning-visit";
 // Document navigation avoids the hosted router's broken lesson transitions.
 import { DAILY_QUEST_XP } from "../daily-quest";
 import { evaluateBackendArtifact, getBackendArtifact } from "../backend/artifacts";
@@ -23,6 +26,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
   paceId: CloudPaceId; lesson: CloudLesson; completed: boolean; daily?: boolean; trackKind?: "cloud" | "backend"; onComplete: () => void;
 }) {
   const backend = trackKind === "backend";
+  useLearningVisit(trackKind, paceId, lesson.id, lesson.title, !daily);
   const trackLabel = backend ? "Backend Engineering" : "Cloud Engineering";
   const trackShortLabel = backend ? "Backend" : "Cloud";
   const lessonTotal = backend ? BACKEND_PATH_TOTAL : CLOUD_PATH_TOTAL;
@@ -106,8 +110,16 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
     setCheckpointResults((current) => current.map((entry, index) => index === questionIndex ? "idle" : entry));
     setSaveError("");
   };
-  const checkKnowledge = (questionIndex: number) => setCheckpointResults((current) => current.map((entry, index) => index === questionIndex ? checkpointChoices[index] === checkpoints[index].answer ? "correct" : "incorrect" : entry));
-  const checkEvidence = () => setEvidenceResult(evidenceChoice === evidence.answer ? "correct" : "incorrect");
+  const checkKnowledge = (questionIndex: number) => {
+    const correct = checkpointChoices[questionIndex] === checkpoints[questionIndex].answer;
+    if (!correct && !recordMissedQuestion({ trackId: trackKind, paceId, lessonId: lesson.id, title: lesson.title }, checkpoints[questionIndex])) setDraftWarning("Review storage is unavailable in this browser.");
+    setCheckpointResults((current) => current.map((entry, index) => index === questionIndex ? correct ? "correct" : "incorrect" : entry));
+  };
+  const checkEvidence = () => {
+    const correct = evidenceChoice === evidence.answer;
+    if (!correct && !recordMissedQuestion({ trackId: trackKind, paceId, lessonId: lesson.id, title: lesson.title }, evidence)) setDraftWarning("Review storage is unavailable in this browser.");
+    setEvidenceResult(correct ? "correct" : "incorrect");
+  };
   const editArtifact = (next: string) => {
     setArtifactCode(next);
     setArtifactResult(null);
@@ -178,6 +190,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
           <p className="pixel-kicker">STEP 1 · LEARN THE IDEA</p>
           <h1 id="cloud-objective">{lesson.title}</h1>
           <p className="learning-lead">{lesson.objective}</p>
+          <LessonDepthPanel trackId={trackKind} paceId={paceId} title={lesson.title} />
           <div className="theory-heading"><span>KNOWLEDGE BLOCKS</span><h2>Build the concept piece by piece</h2></div>
           <div className="theory-grid rich">{lesson.concepts.map((concept, index) => <article key={concept.title}><span>0{index + 1}</span><div><h2>{concept.title}</h2><p>{concept.body}</p></div></article>)}</div>
           <section className="cloud-worked-example" id="cloud-example"><div className="theory-heading"><span>STEP 2 · EXAMPLE WALKTHROUGH</span><h2>A worked example</h2></div><div className="example-code"><div><span>RELAY PLAN</span><small>READ ONLY</small></div><pre className="cloud-example" aria-label="Worked example"><code>{lesson.example}</code></pre></div><p>{lesson.exampleNote}</p></section>

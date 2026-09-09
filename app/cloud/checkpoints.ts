@@ -1,4 +1,6 @@
 import type { CloudLesson } from "./model";
+import { getCloudLesson } from "./catalog";
+import { getLessonDepth } from "../lesson-depth";
 import type { CloudPaceId } from "./track";
 
 export type CloudCheckpoint = {
@@ -90,6 +92,9 @@ const checkpointSeeds: Record<CloudPaceId, Seed[]> = { beginner, intermediate, e
 const paceOffset: Record<CloudPaceId, number> = { beginner: 0, intermediate: 1, expert: 2 };
 
 export function getCloudCheckpoint(paceId: CloudPaceId, lessonId: number): CloudCheckpoint {
+  const title = getCloudLesson(paceId, lessonId)?.title;
+  const audited = title && getLessonDepth("cloud", paceId, title)?.questions[0];
+  if (audited) return { ...audited, options: [audited.options[0], audited.options[1], audited.options[2]] };
   const seed = checkpointSeeds[paceId][lessonId - 1];
   if (!seed) throw new Error(`Missing Cloud checkpoint for ${paceId} lesson ${lessonId}.`);
   const shift = (lessonId + paceOffset[paceId]) % seed.options.length;
@@ -109,6 +114,11 @@ function compact(value: string, maximum = 170) {
 
 /** Three applied decisions per lesson: architecture, failure response, and evidence-led verification. */
 export function getCloudCheckpoints(paceId: CloudPaceId, lesson: CloudLesson): [CloudCheckpoint, CloudCheckpoint, CloudCheckpoint] {
+  const depth = getLessonDepth("cloud", paceId, lesson.title);
+  if (depth) {
+    const questions = depth.questions.map((q): CloudCheckpoint => ({ ...q, options: [q.options[0], q.options[1], q.options[2]] }));
+    return [questions[0], questions[1], questions[2]];
+  }
   const first = getCloudCheckpoint(paceId, lesson.id);
   const primary = lesson.checks[0];
   const secondary = lesson.checks[1] ?? primary;
