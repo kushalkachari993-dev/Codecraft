@@ -53,8 +53,6 @@ production defaults or empirical performance claims.
   signed-in progress synchronization is unchanged. No cross-device review sync
   is claimed. Old mistakes cannot be reconstructed; capture begins with this release.
 
-## Next audit boundary
-
 ## Verification
 
 - Production build succeeded; targeted lint passed.
