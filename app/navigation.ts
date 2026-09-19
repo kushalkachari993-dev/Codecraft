@@ -6,6 +6,7 @@ export type LearningRoute =
   | { kind: "tracks" }
   | { kind: "cloud"; paceId?: LearningPaceId; questId?: number; roadmap?: boolean; daily?: boolean }
   | { kind: "backend"; paceId?: LearningPaceId; questId?: number; roadmap?: boolean; daily?: boolean }
+  | { kind: "frontend"; paceId?: LearningPaceId; questId?: number; roadmap?: boolean; daily?: boolean }
   | { kind: "paces"; trackId: LearningTrackId }
   | { kind: "roadmap"; trackId: LearningTrackId; paceId: LearningPaceId }
   | { kind: "lesson"; trackId: LearningTrackId; paceId: LearningPaceId; questId: number }
@@ -44,6 +45,14 @@ export function parseLearningLocation(location: string): LearningRoute {
   }
   if (segments.length === 3 && segments[0] === "daily-quest" && segments[1] === "backend" && isPaceId(segments[2])) return { kind: "backend", paceId: segments[2], daily: true };
 
+  if (url.pathname === "/tracks/frontend" || url.pathname === "/tracks/frontend/") return { kind: "frontend" };
+  if (segments.length === 3 && segments[0] === "roadmap" && segments[1] === "frontend" && isPaceId(segments[2])) return { kind: "frontend", paceId: segments[2], roadmap: true };
+  if (segments.length === 4 && segments[0] === "lesson" && segments[1] === "frontend" && isPaceId(segments[2]) && /^[0-9]+$/.test(segments[3])) {
+    const questId = Number(segments[3]);
+    if (questId >= 1 && questId <= SPECIAL_TRACK_LESSON_LIMIT) return { kind: "frontend", paceId: segments[2], questId };
+  }
+  if (segments.length === 3 && segments[0] === "daily-quest" && segments[1] === "frontend" && isPaceId(segments[2])) return { kind: "frontend", paceId: segments[2], daily: true };
+
   if (segments.length === 2 && segments[0] === "tracks" && isTrackId(segments[1])) {
     return { kind: "paces", trackId: segments[1] };
   }
@@ -80,7 +89,7 @@ export function parseLearningLocation(location: string): LearningRoute {
 }
 
 export function learningPathForRoute(route: LearningRoute) {
-  if (route.kind === "cloud" || route.kind === "backend") {
+  if (route.kind === "cloud" || route.kind === "backend" || route.kind === "frontend") {
     const paceId = route.paceId ?? "beginner";
     return route.daily ? `/daily-quest/${route.kind}/${paceId}` : route.questId ? `/lesson/${route.kind}/${paceId}/${route.questId}` : route.roadmap ? `/roadmap/${route.kind}/${paceId}` : "/tracks/" + route.kind;
   }

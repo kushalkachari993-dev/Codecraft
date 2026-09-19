@@ -19,6 +19,9 @@ import { getCloudLessons } from "./cloud/catalog";
 import { backendCompleted, backendProfileStat } from "./backend/progress";
 import { BACKEND_PATH_TOTAL, getBackendPath, isBackendPaceId } from "./backend/track";
 import { getBackendLessons } from "./backend/curriculum";
+import { frontendCompleted, frontendProfileStat } from "./frontend/progress";
+import { FRONTEND_PATH_TOTAL, getFrontendPath, isFrontendPaceId } from "./frontend/track";
+import { getFrontendLessons } from "./frontend/curriculum";
 import { useProgressSync } from "./hooks/use-progress-sync";
 import { useProfile } from "./hooks/use-profile";
 import { useLabRuntime } from "./hooks/use-lab-runtime";
@@ -151,7 +154,7 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
     tutorialStep, setTutorialStep,
   } = useJourney((savedJourney) => {
     if (!savedJourney.started) return;
-    if (savedJourney.trackId === "cloud" || savedJourney.trackId === "backend") return;
+    if (savedJourney.trackId === "cloud" || savedJourney.trackId === "backend" || savedJourney.trackId === "frontend") return;
     if ("trackId" in initialRoute) return;
     setActiveTrackId(savedJourney.trackId);
     if (savedJourney.trackId === "python") {
@@ -234,7 +237,7 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
     }, 0);
     return { ...track, completed, total, projects, percent: Math.round((completed / total) * 100) };
   });
-  const totalProjects = [...trackProfileStats, cloudProfileStat(progress), backendProfileStat(progress)].reduce((sum, track) => sum + track.projects, 0);
+  const totalProjects = [...trackProfileStats, cloudProfileStat(progress), backendProfileStat(progress), frontendProfileStat(progress)].reduce((sum, track) => sum + track.projects, 0);
   const activeAvatar = AVATARS.find((avatar) => avatar.id === progress.game.avatarId) ?? AVATARS[0];
   const activeWorlds = activeModules.reduce<Array<{ name: string; number: number; start: number; end: number; completed: number; size: number; projectComplete: boolean; unlocked: boolean }>>((worlds, module, index) => {
     const start = worlds.length ? worlds[worlds.length - 1].end + 1 : 1;
@@ -261,6 +264,7 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
   } = useDailyQuest({ progress, quests: activeQuests, trackId: activeTrack.id, paceId: activePaceId });
   const cloudDailyCard = { completed: dailyQuestCompletedToday, title: getCloudLessons(journey.paceId)[getDailyQuestIndex(todayKey, "cloud", journey.paceId, CLOUD_PATH_TOTAL)].title, trackLabel: "Cloud Engineering", paceLabel: getCloudPath(journey.paceId).label, streak: progress.game.dailyQuestStreak, onOpen: () => window.location.assign("/daily-quest/cloud/" + journey.paceId) };
   const backendDailyCard = { completed: dailyQuestCompletedToday, title: getBackendLessons(journey.paceId)[getDailyQuestIndex(todayKey, "backend", journey.paceId, BACKEND_PATH_TOTAL)].title, trackLabel: "Backend Engineering", paceLabel: getBackendPath(journey.paceId).label, streak: progress.game.dailyQuestStreak, onOpen: () => window.location.assign("/daily-quest/backend/" + journey.paceId) };
+  const frontendDailyCard = { completed: dailyQuestCompletedToday, title: getFrontendLessons(journey.paceId)[getDailyQuestIndex(todayKey, "frontend", journey.paceId, FRONTEND_PATH_TOTAL)].title, trackLabel: "Frontend Web Development", paceLabel: getFrontendPath(journey.paceId).label, streak: progress.game.dailyQuestStreak, onOpen: () => window.location.assign("/daily-quest/frontend/" + journey.paceId) };
   const { enrichment: activeLessonEnrichment, loading: lessonContentLoading } = useLessonEnrichment({
     enabled: view === "roadmap" || (view === "quest" && !dailyQuestMode),
     trackId: activeTrack.id,
@@ -280,6 +284,7 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
       const [trackId, paceId] = key.split("-");
       if (trackId === "cloud" && isCloudPaceId(paceId)) return cloudCompleted(progress, paceId).length === CLOUD_PATH_TOTAL;
       if (trackId === "backend" && isBackendPaceId(paceId)) return backendCompleted(progress, paceId).length === BACKEND_PATH_TOTAL;
+      if (trackId === "frontend" && isFrontendPaceId(paceId)) return frontendCompleted(progress, paceId).length === FRONTEND_PATH_TOTAL;
       const paces = trackId === "python" ? PYTHON_PACES : trackId === "genai" ? GENAI_PACES : trackId === "sql" ? SQL_PACES : [];
       const pace = paces.find((item) => item.id === paceId);
       return Boolean(pace && ids.length === pace.topics.length);
@@ -469,7 +474,7 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
 
   const resumeJourney = (destination: Pick<JourneyPreferences, "trackId" | "paceId">) => {
     persistJourney({ ...destination, started: true, tutorialComplete: true });
-    if (destination.trackId === "cloud" || destination.trackId === "backend") return;
+    if (destination.trackId === "cloud" || destination.trackId === "backend" || destination.trackId === "frontend") return;
     emitAnalytics("journey_resumed", {
       track: destination.trackId,
       pace: destination.paceId,
@@ -890,7 +895,7 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
 
   useEffect(() => {
     routeHandlerRef.current = (route) => {
-      if (route.kind === "cloud" || route.kind === "backend") { window.location.assign(learningPathForRoute(route)); return; }
+      if (route.kind === "cloud" || route.kind === "backend" || route.kind === "frontend") { window.location.assign(learningPathForRoute(route)); return; }
       setRouteReady(route.kind !== "daily-quest");
 
       if (route.kind === "profile") {
@@ -1096,7 +1101,7 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
         totalBadges={totalBadges}
         totalProjects={totalProjects}
         progress={progress}
-        trackStats={[...trackProfileStats, cloudProfileStat(progress), backendProfileStat(progress)]}
+        trackStats={[...trackProfileStats, cloudProfileStat(progress), backendProfileStat(progress), frontendProfileStat(progress)]}
         avatars={AVATARS}
         activeAvatar={activeAvatar}
         achievements={achievements}
@@ -1123,7 +1128,7 @@ export function CodeCraftApp({ initialPath = "/tracks" }: { initialPath?: string
         <TrackPickerView
           journey={journey}
           totalBadges={totalBadges}
-          dailyQuest={journey.trackId === "cloud" ? cloudDailyCard : journey.trackId === "backend" ? backendDailyCard : { completed: dailyQuestCompletedToday, title: dailyQuestPreview.title, trackLabel: activeTrack.label, paceLabel: activePace.label, streak: progress.game.dailyQuestStreak, onOpen: openDailyQuest }}
+          dailyQuest={journey.trackId === "cloud" ? cloudDailyCard : journey.trackId === "backend" ? backendDailyCard : journey.trackId === "frontend" ? frontendDailyCard : { completed: dailyQuestCompletedToday, title: dailyQuestPreview.title, trackLabel: activeTrack.label, paceLabel: activePace.label, streak: progress.game.dailyQuestStreak, onOpen: openDailyQuest }}
           progress={progress}
           recommendation={goalRecommendation}
           cloudUser={cloudUser}

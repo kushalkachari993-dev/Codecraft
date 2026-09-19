@@ -11,6 +11,11 @@ import { getBackendCheckpoints } from "../backend/checkpoints";
 import { getBackendEvidenceExercise } from "../backend/evidence";
 import { backendLessonXp } from "../backend/progress";
 import { BACKEND_PATH_TOTAL, getBackendPath, isBackendWorldProject } from "../backend/track";
+import { evaluateFrontendArtifact, getFrontendArtifact } from "../frontend/artifacts";
+import { getFrontendCheckpoints } from "../frontend/checkpoints";
+import { getFrontendEvidenceExercise } from "../frontend/evidence";
+import { frontendLessonXp } from "../frontend/progress";
+import { FRONTEND_PATH_TOTAL, getFrontendPath, isFrontendWorldProject } from "../frontend/track";
 import { evaluateCloudArtifact, getCloudArtifact, type CloudArtifactResult } from "./artifacts";
 import { getCloudCheckpoints } from "./checkpoints";
 import { getCloudEvidenceExercise } from "./evidence";
@@ -18,24 +23,25 @@ import { evaluateCloudPlan, parseCloudPlan, serializeCloudPlan, type CloudLesson
 import { cloudLessonXp } from "./progress";
 import { CLOUD_PATH_TOTAL, getCloudPath, isCloudWorldProject, type CloudPaceId } from "./track";
 
-const lessonPath = (trackId: "cloud" | "backend", paceId: CloudPaceId, id: number) => "/lesson/" + trackId + "/" + paceId + "/" + id;
+const lessonPath = (trackId: "cloud" | "backend" | "frontend", paceId: CloudPaceId, id: number) => "/lesson/" + trackId + "/" + paceId + "/" + id;
 const FORMATS: CloudPlanFormat[] = ["json", "hcl", "yaml"];
 const formatLabel = (format: CloudPlanFormat) => format === "hcl" ? "HCL" : format.toUpperCase();
 
 export default function CloudLab({ paceId, lesson, completed, daily = false, trackKind = "cloud", onComplete }: {
-  paceId: CloudPaceId; lesson: CloudLesson; completed: boolean; daily?: boolean; trackKind?: "cloud" | "backend"; onComplete: () => void;
+  paceId: CloudPaceId; lesson: CloudLesson; completed: boolean; daily?: boolean; trackKind?: "cloud" | "backend" | "frontend"; onComplete: () => void;
 }) {
   const backend = trackKind === "backend";
+  const frontend = trackKind === "frontend";
   useLearningVisit(trackKind, paceId, lesson.id, lesson.title, !daily);
-  const trackLabel = backend ? "Backend Engineering" : "Cloud Engineering";
-  const trackShortLabel = backend ? "Backend" : "Cloud";
-  const lessonTotal = backend ? BACKEND_PATH_TOTAL : CLOUD_PATH_TOTAL;
-  const path = backend ? getBackendPath(paceId) : getCloudPath(paceId);
-  const checkpoints = backend ? getBackendCheckpoints(paceId, lesson) : getCloudCheckpoints(paceId, lesson);
-  const evidence = backend ? getBackendEvidenceExercise(paceId, lesson) : getCloudEvidenceExercise(paceId, lesson);
-  const artifact = backend ? getBackendArtifact(paceId, lesson) : getCloudArtifact(paceId, lesson);
-  const evaluateArtifact = backend ? evaluateBackendArtifact : evaluateCloudArtifact;
-  const worldProject = backend ? isBackendWorldProject(paceId, lesson.id) : isCloudWorldProject(paceId, lesson.id);
+  const trackLabel = frontend ? "Frontend Web Development" : backend ? "Backend Engineering" : "Cloud Engineering";
+  const trackShortLabel = frontend ? "Frontend" : backend ? "Backend" : "Cloud";
+  const lessonTotal = frontend ? FRONTEND_PATH_TOTAL : backend ? BACKEND_PATH_TOTAL : CLOUD_PATH_TOTAL;
+  const path = frontend ? getFrontendPath(paceId) : backend ? getBackendPath(paceId) : getCloudPath(paceId);
+  const checkpoints = frontend ? getFrontendCheckpoints(paceId, lesson) : backend ? getBackendCheckpoints(paceId, lesson) : getCloudCheckpoints(paceId, lesson);
+  const evidence = frontend ? getFrontendEvidenceExercise(paceId, lesson) : backend ? getBackendEvidenceExercise(paceId, lesson) : getCloudEvidenceExercise(paceId, lesson);
+  const artifact = frontend ? getFrontendArtifact(paceId, lesson) : backend ? getBackendArtifact(paceId, lesson) : getCloudArtifact(paceId, lesson);
+  const evaluateArtifact = frontend ? evaluateFrontendArtifact : backend ? evaluateBackendArtifact : evaluateCloudArtifact;
+  const worldProject = frontend ? isFrontendWorldProject(paceId, lesson.id) : backend ? isBackendWorldProject(paceId, lesson.id) : isCloudWorldProject(paceId, lesson.id);
   const draftKey = (planFormat: CloudPlanFormat) => "codecraft-" + trackKind + "-draft-v2-" + paceId + "-" + lesson.id + "-" + planFormat;
   const artifactDraftKey = "codecraft-" + trackKind + "-artifact-v1-" + paceId + "-" + lesson.id + "-" + artifact.kind;
   const [format, setFormat] = useState<CloudPlanFormat>("json");
@@ -137,7 +143,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
   const complete = () => {
     // Revalidate the current editor contents; a prior green run is never enough.
     if (!checkpointPassed) {
-      setSaveError("Pass all three architecture decisions before completing this lesson.");
+      setSaveError(`Pass all three ${frontend ? "interface" : "architecture"} decisions before completing this lesson.`);
       return;
     }
     if (!evidencePassed) {
@@ -163,7 +169,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
     const checked = evaluateCloudPlan(lesson, code, format);
     const reviewedArtifact = evaluateArtifact(artifact, artifactCode);
     if (!checked.passed || !reviewedArtifact.passed) { setResult(checked); setArtifactResult(reviewedArtifact); return; }
-    const report = { format: "CodeCraft " + trackShortLabel + " review bundle v3 — educational simulation only", sourceFormat: formatLabel(format), lesson: lesson.title, plan: checked.plan, checks: checked.checks.map(({ name, passed }) => ({ name, passed })), observations: checked.observations, evidenceExercise: evidence.label, artifact: { kind: artifact.kind, filename: artifact.filename, source: artifactCode, checks: reviewedArtifact.checks.map(({ name, passed }) => ({ name, passed })) }, warning: backend ? "Static backend training output only. No service, database, queue, or external API was contacted." : "Static training output only. No infrastructure was created, no credentials were used, and costs are fictional." };
+    const report = { format: "CodeCraft " + trackShortLabel + " review bundle v3 — educational simulation only", sourceFormat: formatLabel(format), lesson: lesson.title, plan: checked.plan, checks: checked.checks.map(({ name, passed }) => ({ name, passed })), observations: checked.observations, evidenceExercise: evidence.label, artifact: { kind: artifact.kind, filename: artifact.filename, source: artifactCode, checks: reviewedArtifact.checks.map(({ name, passed }) => ({ name, passed })) }, warning: frontend ? "Static frontend training output only. No artifact was executed, published, or sent to an external service." : backend ? "Static backend training output only. No service, database, queue, or external API was contacted." : "Static training output only. No infrastructure was created, no credentials were used, and costs are fictional." };
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -171,7 +177,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const rewardXp = daily ? DAILY_QUEST_XP : backend ? backendLessonXp(lesson.id, paceId) : cloudLessonXp(lesson.id, paceId);
+  const rewardXp = daily ? DAILY_QUEST_XP : frontend ? frontendLessonXp(lesson.id, paceId) : backend ? backendLessonXp(lesson.id, paceId) : cloudLessonXp(lesson.id, paceId);
   const canComplete = result?.passed === true && checkpointPassed && evidencePassed && artifactPassed;
 
   return (
@@ -193,10 +199,10 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
           <LessonDepthPanel trackId={trackKind} paceId={paceId} title={lesson.title} />
           <div className="theory-heading"><span>KNOWLEDGE BLOCKS</span><h2>Build the concept piece by piece</h2></div>
           <div className="theory-grid rich">{lesson.concepts.map((concept, index) => <article key={concept.title}><span>0{index + 1}</span><div><h2>{concept.title}</h2><p>{concept.body}</p></div></article>)}</div>
-          <section className="cloud-worked-example" id="cloud-example"><div className="theory-heading"><span>STEP 2 · EXAMPLE WALKTHROUGH</span><h2>A worked example</h2></div><div className="example-code"><div><span>RELAY PLAN</span><small>READ ONLY</small></div><pre className="cloud-example" aria-label="Worked example"><code>{lesson.example}</code></pre></div><p>{lesson.exampleNote}</p></section>
+          <section className="cloud-worked-example" id="cloud-example"><div className="theory-heading"><span>STEP 2 · EXAMPLE WALKTHROUGH</span><h2>A worked example</h2></div><div className="example-code"><div><span>{frontend ? "RENDERING CONTRACT" : "RELAY PLAN"}</span><small>READ ONLY</small></div><pre className="cloud-example" aria-label="Worked example"><code>{lesson.example}</code></pre></div><p>{lesson.exampleNote}</p></section>
           <div className="theory-insights cloud-insights"><article className="mistake-note"><span>! COMMON MISTAKE</span><h2>Watch out for this</h2><p>{lesson.mistake}</p></article></div>
           <section className="cloud-checkpoint" id="cloud-checkpoint" aria-labelledby="cloud-checkpoint-title">
-            <div className="theory-heading"><span>STEP 3 · THREE REQUIRED DECISIONS</span><h2 id="cloud-checkpoint-title">Reason through the architecture</h2></div>
+            <div className="theory-heading"><span>STEP 3 · THREE REQUIRED DECISIONS</span><h2 id="cloud-checkpoint-title">Reason through the {frontend ? "interface" : "architecture"}</h2></div>
             <p className="cloud-checkpoint-progress">{checkpointResults.filter((entry) => entry === "correct").length} of {checkpoints.length} decisions verified</p>
             <div className="cloud-checkpoint-stack">{checkpoints.map((checkpoint, questionIndex) => {
               const choice = checkpointChoices[questionIndex];
@@ -213,7 +219,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
               </section>;
             })}</div>
           </section>
-          <details className="cloud-json-help" open={lesson.id === 1}><summary>How the two local practice editors differ</summary><p>The Relay plan simulator uses one flat configuration in JSON, HCL, or YAML so the same architecture model can be compared across formats.</p><pre><code>{'JSON   "timeout_ms": 500\nHCL    timeout_ms = 500\nYAML   timeout_ms: 500'}</code></pre><p>{backend ? "The artifact studio uses realistic nested OpenAPI, service configuration, SQL migration, and event-schema text." : "The artifact studio uses realistic nested Terraform, Kubernetes, IAM, or CI/CD text."} Its static rules never execute a command, contact a provider, or require credentials.</p></details>
+          <details className="cloud-json-help" open={lesson.id === 1}><summary>How the two local practice editors differ</summary><p>The {frontend ? "rendering contract" : "Relay plan"} simulator uses one flat configuration in JSON, HCL, or YAML so the same design model can be compared across formats.</p><pre><code>{'JSON   "timeout_ms": 500\nHCL    timeout_ms = 500\nYAML   timeout_ms: 500'}</code></pre><p>{frontend ? "The artifact studio uses realistic HTML, CSS, TypeScript, and frontend delivery-policy text." : backend ? "The artifact studio uses realistic nested OpenAPI, service configuration, SQL migration, and event-schema text." : "The artifact studio uses realistic nested Terraform, Kubernetes, IAM, or CI/CD text."} Its static rules never execute a command, contact a provider, or require credentials.</p></details>
           <p className="cloud-reference">Go deeper: <a href={lesson.source.url} target="_blank" rel="noreferrer">{lesson.source.label} ↗</a></p>
           </div>
         </article>
@@ -221,14 +227,14 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
           <p className="pixel-kicker">STEP 4 · REPAIR AND TROUBLESHOOT</p>
           <h2 id="cloud-lab-title">{worldProject ? "Multi-stage " + trackShortLabel + " mission" : "Your " + trackLabel + " lab"}</h2>
           <p className="cloud-mission">{lesson.mission}</p>
-          <p className="cloud-simulation-note"><strong>Local, static training only.</strong> {backend ? "No server, database, queue, external API, or credentials are used." : "No provider login, live infrastructure, external API, credentials, or cloud charges."} Every scanner runs deterministically in this page.</p>
+          <p className="cloud-simulation-note"><strong>Local, static training only.</strong> {frontend ? "No submitted markup, style, script, or policy is executed or published." : backend ? "No server, database, queue, external API, or credentials are used." : "No provider login, live infrastructure, external API, credentials, or cloud charges."} Every scanner runs deterministically in this page.</p>
           {worldProject && <section className="cloud-capstone-stages" aria-labelledby="cloud-capstone-title">
-            <div><small>WORLD PROJECT</small><h3 id="cloud-capstone-title">Four-stage architecture and recovery review</h3><p>Complete each gate in order, from design reasoning through incident evidence and two independent repairs.</p></div>
+            <div><small>WORLD PROJECT</small><h3 id="cloud-capstone-title">Four-stage {frontend ? "product experience" : "architecture"} and recovery review</h3><p>Complete each gate in order, from design reasoning through incident evidence and two independent repairs.</p></div>
             <ol>
-              <li className={checkpointPassed ? "done" : "active"}><span>{checkpointPassed ? "✓" : "1"}</span><div><strong>Architecture decisions</strong><small>Three scenarios</small></div></li>
+              <li className={checkpointPassed ? "done" : "active"}><span>{checkpointPassed ? "✓" : "1"}</span><div><strong>{frontend ? "Interface" : "Architecture"} decisions</strong><small>Three scenarios</small></div></li>
               <li className={evidencePassed ? "done" : checkpointPassed ? "active" : ""}><span>{evidencePassed ? "✓" : "2"}</span><div><strong>Incident triage</strong><small>{evidence.label}</small></div></li>
               <li className={artifactPassed ? "done" : checkpointPassed && evidencePassed ? "active" : ""}><span>{artifactPassed ? "✓" : "3"}</span><div><strong>Artifact repair</strong><small>{artifact.label}</small></div></li>
-              <li className={result?.passed ? "done" : checkpointPassed && evidencePassed && artifactPassed ? "active" : ""}><span>{result?.passed ? "✓" : "4"}</span><div><strong>System verification</strong><small>Relay plan</small></div></li>
+              <li className={result?.passed ? "done" : checkpointPassed && evidencePassed && artifactPassed ? "active" : ""}><span>{result?.passed ? "✓" : "4"}</span><div><strong>{frontend ? "Experience" : "System"} verification</strong><small>{frontend ? "Rendering contract" : "Relay plan"}</small></div></li>
             </ol>
           </section>}
 
@@ -254,11 +260,11 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
             </div>
           </section>
 
-          <div className="cloud-stage-heading"><span>ARCHITECTURE SIMULATOR</span><h3>Repair the Relay plan</h3><p>Choose JSON, HCL, or YAML and repair the same fictional system model.</p></div>
+          <div className="cloud-stage-heading"><span>{frontend ? "EXPERIENCE SIMULATOR" : "ARCHITECTURE SIMULATOR"}</span><h3>Repair the {frontend ? "rendering contract" : "Relay plan"}</h3><p>Choose JSON, HCL, or YAML and repair the same fictional {frontend ? "interface" : "system"} model.</p></div>
           <div className="cloud-format-tabs" role="tablist" aria-label="Configuration format">
             {FORMATS.map((entry) => <button key={entry} type="button" role="tab" aria-selected={format === entry} aria-controls="cloud-plan" className={format === entry ? "active" : ""} onClick={() => switchFormat(entry)}>{formatLabel(entry)}</button>)}
           </div>
-          <div className="cloud-editor-heading"><label htmlFor="cloud-plan">Relay plan · {formatLabel(format)}</label><span>Safe flat training syntax</span></div>
+          <div className="cloud-editor-heading"><label htmlFor="cloud-plan">{frontend ? "Rendering contract" : "Relay plan"} · {formatLabel(format)}</label><span>Safe flat training syntax</span></div>
           <textarea id="cloud-plan" className="cloud-editor" value={code} spellCheck={false} autoCapitalize="off" autoComplete="off" autoCorrect="off" maxLength={16_000} aria-describedby="cloud-editor-help" onChange={(event) => edit(event.target.value)} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); run(); } }} />
           <p className="cloud-editor-help" id="cloud-editor-help">Edit the injected failure, then run the simulation. Ctrl/⌘ + Enter also runs it. Format switching converts valid syntax without changing the plan.</p>
           <div className="cloud-lab-actions">
@@ -291,7 +297,7 @@ export default function CloudLab({ paceId, lesson, completed, daily = false, tra
           ) : (
             <div className="cloud-complete-action">
               <button className="curriculum-next cloud-button" disabled={!canComplete} onClick={complete}>{daily ? "Claim daily reward" : "Complete lesson"} · +{rewardXp} XP</button>
-              <p>{canComplete ? "All decision, evidence, artifact, and system checks passed. Save your completion." : "Finish all four gates: architecture decisions, evidence triage, static artifact review, and the Relay plan simulation."}</p>
+              <p>{canComplete ? "All decision, evidence, artifact, and system checks passed. Save your completion." : `Finish all four gates: ${frontend ? "interface" : "architecture"} decisions, evidence triage, static artifact review, and the ${frontend ? "rendering contract" : "Relay plan"} simulation.`}</p>
             </div>
           )}
           {lesson.id === lessonTotal && result?.passed && artifactPassed && <button className="curriculum-next cloud-button cloud-button-secondary cloud-download" onClick={download}>Download verified review bundle ↓</button>}
