@@ -20,8 +20,9 @@ function htmlArtifact(lesson: CloudLesson, safe: boolean) {
   </section>
 </main>`;
 }
-function cssArtifact(safe: boolean) {
-  return `@layer reset, tokens, components;
+function cssArtifact(lesson: CloudLesson, safe: boolean) {
+  return `/* ${lesson.title}: responsive component review */
+@layer reset, tokens, components;
 @layer tokens {
   :root { --space: 1rem; --focus: #a8ff3e; --measure: 68ch; }
 }
@@ -33,8 +34,9 @@ function cssArtifact(safe: boolean) {
   ${safe ? "@media (prefers-reduced-motion: reduce) { .lesson-card * { animation-duration: 0.01ms; animation-iteration-count: 1; } }" : ".lesson-card { width: 980px; animation: pulse 1s infinite; }"}
 }`;
 }
-function scriptArtifact(safe: boolean) {
-  return `type ViewState =
+function scriptArtifact(lesson: CloudLesson, safe: boolean) {
+  return `// ${lesson.title}: typed interaction review
+type ViewState =
   | { status: "idle" }
   | { status: "loading"; requestId: string }
   | { status: "success"; items: string[] }
@@ -58,8 +60,9 @@ export async function loadItems(): Promise<void> {
   }
 }`;
 }
-function policyArtifact(safe: boolean) {
+function policyArtifact(lesson: CloudLesson, safe: boolean) {
   return JSON.stringify({
+    lesson: lesson.title,
     build: { immutable: safe, source_maps: safe ? "private" : "public", budgets: { initial_kb: safe ? 220 : 900, route_kb: safe ? 420 : 1200 } },
     quality: { unit: true, component: safe, e2e: safe, accessibility: safe },
     security: { csp: safe ? "script-src 'self' 'nonce-{RANDOM}'; object-src 'none'; base-uri 'none'" : "script-src * 'unsafe-inline' 'unsafe-eval'", trusted_types: safe },
@@ -68,7 +71,11 @@ function policyArtifact(safe: boolean) {
 }
 
 export function getFrontendArtifact(paceId: FrontendPaceId, lesson: CloudLesson): CloudArtifact {
-  const kind = (lesson.id - 1 + (paceId === "intermediate" ? 1 : paceId === "expert" ? 2 : 0)) % 4;
+  const title = lesson.title;
+  const kind = /Browsers and URLs|HTML|Semantic|Links|Media|Forms|Accessibility|Interaction Design|Internationalization/.test(title) ? 0
+    : /CSS|Layout|Typography|Flexbox|Grid|Responsive|Mobile-first|Animation|Theming|Rendering Pipeline/.test(title) ? 1
+      : /HTTP Basics|JavaScript|Functions|DOM|State-driven|Fetching|TypeScript|Async|Storage|Modules|Component Design|Web APIs|Offline|Streaming|Memory|Event Loop/.test(title) ? 2
+        : 3;
   const variants = [
     { artifactKind: "iam" as const, label: "Semantic interface fragment", filename: "lesson.html", language: "HTML", starter: htmlArtifact(lesson, false), solution: htmlArtifact(lesson, true), checks: [
       artifactCheck("Document has one meaningful main region", "Keep a main element and label the lesson section from its heading.", (s) => /<main\b/i.test(s) && /<section\s+aria-labelledby=/i.test(s)),
@@ -76,19 +83,19 @@ export function getFrontendArtifact(paceId: FrontendPaceId, lesson: CloudLesson)
       artifactCheck("Action uses a native button", "Use a submit button instead of a clickable div.", (s) => /<button\s+type=["']submit["']/i.test(s) && !/onclick=/i.test(s)),
       artifactCheck("Status is announced", "Give lesson-status role=status.", (s) => /id=["']lesson-status["'][^>]*role=["']status["']/i.test(s)),
     ] },
-    { artifactKind: "terraform" as const, label: "Responsive component stylesheet", filename: "lesson-card.css", language: "CSS", starter: cssArtifact(false), solution: cssArtifact(true), checks: [
+    { artifactKind: "terraform" as const, label: "Responsive component stylesheet", filename: "lesson-card.css", language: "CSS", starter: cssArtifact(lesson, false), solution: cssArtifact(lesson, true), checks: [
       artifactCheck("Cascade layers are explicit", "Keep reset, tokens, and components layers.", (s) => /@layer\s+reset,\s*tokens,\s*components/.test(s)),
       artifactCheck("Keyboard focus remains visible", "Add a :focus-visible outline.", (s) => /:focus-visible/.test(s) && /outline:\s*3px/.test(s) && !/outline:\s*none/.test(s)),
       artifactCheck("Layout responds to its container", "Use a container query rather than a fixed viewport assumption.", (s) => /@container\s*\(/.test(s) && !/width:\s*980px/.test(s)),
       artifactCheck("Reduced motion is respected", "Add a prefers-reduced-motion rule.", (s) => /prefers-reduced-motion:\s*reduce/.test(s)),
     ] },
-    { artifactKind: "kubernetes" as const, label: "Typed asynchronous view model", filename: "load-items.ts", language: "TypeScript", starter: scriptArtifact(false), solution: scriptArtifact(true), checks: [
+    { artifactKind: "kubernetes" as const, label: "Typed asynchronous view model", filename: "load-items.ts", language: "TypeScript", starter: scriptArtifact(lesson, false), solution: scriptArtifact(lesson, true), checks: [
       artifactCheck("Obsolete requests are cancelled", "Abort the previous controller before creating the next request.", (s) => /controller\?\.abort\(\)/.test(s)),
       artifactCheck("HTTP failure is classified", "Check response.ok before parsing the payload.", (s) => /if\s*\(!response\.ok\)/.test(s)),
       artifactCheck("External data is validated", "Validate the array and item types before using it.", (s) => /Array\.isArray\(items\)/.test(s) && /typeof item === ["']string["']/.test(s)),
       artifactCheck("Cancellation and user error differ", "Ignore AbortError and render a safe recovery message for other errors.", (s) => /AbortError/.test(s) && /could not be loaded/.test(s)),
     ] },
-    { artifactKind: "cicd" as const, label: "Frontend delivery policy", filename: "frontend.release.json", language: "JSON", starter: policyArtifact(false), solution: policyArtifact(true), checks: [
+    { artifactKind: "cicd" as const, label: "Frontend delivery policy", filename: "frontend.release.json", language: "JSON", starter: policyArtifact(lesson, false), solution: policyArtifact(lesson, true), checks: [
       artifactCheck("Build output is immutable and bounded", "Enable immutable builds with initial and route budgets.", (s) => /"immutable": true/.test(s) && /"initial_kb": 220/.test(s) && /"route_kb": 420/.test(s)),
       artifactCheck("Quality gates cover user behavior", "Enable component, end-to-end, and accessibility gates.", (s) => /"component": true/.test(s) && /"e2e": true/.test(s) && /"accessibility": true/.test(s)),
       artifactCheck("CSP is strict", "Remove unsafe-inline and unsafe-eval; require a nonce and Trusted Types.", (s) => /nonce-\{RANDOM\}/.test(s) && /"trusted_types": true/.test(s) && !/unsafe-(?:inline|eval)/.test(s)),

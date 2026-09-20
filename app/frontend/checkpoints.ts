@@ -1,5 +1,6 @@
 import type { CloudCheckpoint } from "../cloud/checkpoints";
 import type { CloudLesson } from "../cloud/model";
+import { getFrontendEnrichment } from "./enrichment";
 import type { FrontendPaceId } from "./track";
 
 type Seed = { question: string; correct: string; wrongA: string; wrongB: string; explanation: string };
@@ -11,19 +12,20 @@ function rotate(seed: Seed, offset: number): CloudCheckpoint {
 }
 
 export function getFrontendCheckpoints(paceId: FrontendPaceId, lesson: CloudLesson): CloudCheckpoint[] {
-  const boundary = String(lesson.solution.boundary);
   const failure = String(lesson.solution.failure_mode);
   const timeout = Number(lesson.solution.timeout_ms);
   const retries = Number(lesson.solution.retry_limit);
   const controls = Array.isArray(lesson.solution.safeguards) ? lesson.solution.safeguards.map(String) : [];
+  const controlTuple: [string, string, string] = [controls[0] ?? "primary-control", controls[1] ?? "secondary-control", controls[2] ?? "verification-control"];
+  const enrichment = getFrontendEnrichment(lesson.title, lesson.objective, failure, "the lesson's user signal", controlTuple);
   const review = paceId === "expert" ? "platform review" : paceId === "intermediate" ? "release review" : "interface review";
   const seeds: Seed[] = [
     {
-      question: `A user reaches the ${boundary} boundary and encounters “${failure}”. Which response preserves context and access?`,
-      correct: `Expose a clear state and recovery path, preserve the user’s work, and verify ${controls[0]} with keyboard and assistive-technology behavior.`,
-      wrongA: "Replace the view with a generic spinner until the user refreshes the page.",
-      wrongB: "Log the failure silently because visible errors reduce conversion.",
-      explanation: `The failure is part of the interface contract. ${controls[0]} must work in the rendered experience, not only exist in source code.`,
+      question: enrichment.review.question,
+      correct: enrichment.review.correct,
+      wrongA: enrichment.review.trap,
+      wrongB: "Approve the implementation from one successful desktop screenshot without reproducing the boundary state.",
+      explanation: `${enrichment.exampleNote} ${enrichment.mentalModel}`,
     },
     {
       question: `The ${lesson.title} interaction has a ${timeout} ms budget and ${retries} ${retries === 1 ? "retry" : "retries"}. What is the safest implementation?`,

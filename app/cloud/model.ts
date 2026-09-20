@@ -9,9 +9,12 @@ export type CloudLesson = {
   objective: string;
   story: string;
   concepts: Array<{ title: string; body: string }>;
+  exampleLabel?: string;
   example: string;
   exampleNote: string;
   mistake: string;
+  practice?: { prompt: string; deliverable: string; success: string };
+  projectStages?: Array<{ title: string; brief: string; evidence: string }>;
   mission: string;
   fields: CloudField[];
   starter: CloudPlan;

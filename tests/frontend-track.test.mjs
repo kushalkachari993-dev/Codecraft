@@ -29,6 +29,7 @@ async function loadModule(path) {
 }
 
 const { FRONTEND_CURRICULA, getFrontendLesson, getFrontendLessons } = await loadModule("app/frontend/curriculum.ts");
+const { FRONTEND_ENRICHMENT_COUNT } = await loadModule("app/frontend/enrichment.ts");
 const { evaluateFrontendArtifact, getFrontendArtifact } = await loadModule("app/frontend/artifacts.ts");
 const { getFrontendCheckpoints } = await loadModule("app/frontend/checkpoints.ts");
 const { getFrontendEvidenceExercise } = await loadModule("app/frontend/evidence.ts");
@@ -43,15 +44,23 @@ test("Frontend contains three complete and distinct 21-topic paths", () => {
   assert.deepEqual(Object.keys(FRONTEND_CURRICULA), PACES);
   assert.equal(FRONTEND_PATH_TOTAL, 21);
   assert.equal(FRONTEND_TRACK.total, 63);
+  assert.equal(FRONTEND_ENRICHMENT_COUNT, 63);
   assert.equal(new Set(PACES.flatMap((paceId) => getFrontendLessons(paceId).map((lesson) => lesson.title))).size, 63);
+  assert.equal(new Set(PACES.flatMap((paceId) => getFrontendLessons(paceId).map((lesson) => lesson.example))).size, 63);
   for (const paceId of PACES) {
     const lessons = getFrontendLessons(paceId);
     assert.deepEqual(lessons.map((lesson) => lesson.id), Array.from({ length: 21 }, (_, index) => index + 1));
     assert.deepEqual(getFrontendWorlds(paceId).map((world) => world.end), [5, 10, 15, 21]);
     assert.deepEqual(lessons.filter((lesson) => isFrontendWorldProject(paceId, lesson.id)).map((lesson) => lesson.id), [5, 10, 15, 21]);
     for (const lesson of lessons) {
-      assert.equal(lesson.concepts.length, 3);
-      assert.ok(lesson.concepts.every((concept) => concept.body.length >= 120), paceId + " lesson " + lesson.id);
+      assert.equal(lesson.concepts.length, 4);
+      assert.ok(lesson.concepts.every((concept) => concept.body.length >= 90), paceId + " lesson " + lesson.id);
+      assert.ok(lesson.exampleLabel.length >= 8);
+      assert.ok(lesson.example.length >= 80);
+      assert.ok(lesson.practice.prompt.length >= 50);
+      assert.ok(lesson.practice.deliverable.length >= 80);
+      if (isFrontendWorldProject(paceId, lesson.id)) assert.equal(lesson.projectStages.length, 4);
+      else assert.equal(lesson.projectStages, undefined);
       assert.equal(lesson.fields.length, 6);
       assert.equal(lesson.checks.length, 5);
       for (const format of ["json", "hcl", "yaml"]) {

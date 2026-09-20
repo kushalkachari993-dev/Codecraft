@@ -1,4 +1,5 @@
 import { check, exactSet, field, type CloudLesson, type CloudPlan } from "../cloud/model";
+import { getFrontendEnrichment } from "./enrichment";
 import type { FrontendPaceId } from "./track";
 
 type SourceKey = "mdn" | "html" | "css" | "javascript" | "a11y" | "performance" | "typescript" | "security" | "testing";
@@ -88,25 +89,39 @@ const EXPERT: TopicSpec[] = [
   topic("Production-grade Offline App Capstone", "Design, secure, test, ship, observe, and recover an offline-capable application across multiple release stages.", "user-browser-edge-api", "partial updates break cached clients and hide sync conflicts", "resilient_user_journeys", ["versioned-contract", "security-policy", "rollback-drill"], "performance"),
 ];
 
-function buildLesson(spec: TopicSpec, id: number, paceId: FrontendPaceId): CloudLesson {
+function buildLesson(spec: TopicSpec, id: number, paceId: FrontendPaceId, allTopics: TopicSpec[]): CloudLesson {
   const latencyBudget = 100 + ((id + (paceId === "expert" ? 2 : paceId === "intermediate" ? 1 : 0)) % 5) * 100;
   const retryLimit = spec.title.includes("Fetching") || spec.title.includes("Caching") || spec.title.includes("Offline") ? 2 : 1;
   const solution: CloudPlan = { boundary: spec.boundary, failure_mode: spec.failure, timeout_ms: latencyBudget, retry_limit: retryLimit, idempotent: true, safeguards: [...spec.controls] };
   const starter: CloudPlan = { boundary: "implicit", failure_mode: "happy-path-only", timeout_ms: 5000, retry_limit: 6, idempotent: false, safeguards: [spec.controls[0]] };
   const level = paceId === "expert" ? "architecture" : paceId === "intermediate" ? "product" : "foundation";
+  const enrichment = getFrontendEnrichment(spec.title, spec.goal, spec.failure, spec.metric, spec.controls);
+  const isProject = id === 5 || id === 10 || id === 15 || id === 21;
+  const worldStart = id === 21 ? 16 : id - 4;
+  const worldTopics = allTopics.slice(worldStart - 1, id);
+  const projectStages = isProject ? [
+    { title: `Audit ${worldTopics[0].title}`, brief: `Reproduce the primary journey and identify where ${worldTopics[0].boundary} first stops meeting its user contract.`, evidence: `a short trace tied to ${worldTopics[0].metric}` },
+    { title: `Connect ${worldTopics[1].title} to ${worldTopics[2].title}`, brief: `Implement the smallest vertical slice that preserves both topics' constraints instead of solving them in isolation.`, evidence: `a working state plus one rejected unsafe alternative` },
+    { title: `Stress ${worldTopics[3].title}`, brief: `Exercise keyboard input, narrow layout, slow delivery, and the explicit failure state before accepting the implementation.`, evidence: `normal, boundary, and recovery results` },
+    { title: `Defend ${spec.title}`, brief: `Combine the world's decisions, repair the injected artifact and plan, and explain the release or rollback signal.`, evidence: `checkpoint reasoning, incident conclusion, static review, and simulation trace` },
+  ] : undefined;
   return {
     id, title: spec.title, minutes: id % 5 === 0 || id === 21 ? 32 : paceId === "expert" ? 24 : paceId === "intermediate" ? 21 : 18,
     objective: spec.goal,
     story: `The ${spec.boundary} interface is reporting ${spec.metric}, but its failure behavior is still implicit. Make the user contract measurable before Byte restores the ${level} relay.`,
     concepts: [
-      { title: "Model the user contract", body: `${spec.goal} Treat ${spec.boundary} as an observable boundary with clear inputs, outputs, states, and ownership—not only a visual implementation.` },
-      { title: "Design the failure state", body: `Plan for this realistic failure: ${spec.failure}. Apply ${spec.controls.join(", ")} as independent protections so the interface remains understandable and recoverable.` },
-      { title: "Verify the experience", body: `Measure ${spec.metric} across keyboard, narrow viewport, slow network, and recovery scenarios. A green build alone does not prove the user journey works.` },
+      { title: "Build the mental model", body: enrichment.mentalModel },
+      { title: "Make the engineering decision", body: enrichment.implementation },
+      { title: "Understand the failure mechanics", body: `The concrete failure for this lesson is that ${spec.failure}. Trace it through ${spec.boundary}; then treat ${spec.controls.join(", ")} as separate protections rather than one all-or-nothing fix.` },
+      { title: "Prove the user outcome", body: `Use ${spec.metric} as the primary signal, but verify it alongside keyboard behavior, narrow and zoomed layouts, slow delivery, and recovery. ${enrichment.diagnostic}` },
     ],
-    example: JSON.stringify(solution, null, 2),
-    exampleNote: `This rendering contract gives ${spec.boundary} a ${latencyBudget} ms interaction budget, at most ${retryLimit} safe ${retryLimit === 1 ? "retry" : "retries"}, repeat-safe behavior, and three topic-specific controls.`,
-    mistake: `Do not hide “${spec.failure}” behind a generic fallback. If the interface does not model the failure, users lose context while tests exercise only the happy path.`,
-    mission: `Repair the ${spec.boundary} experience, investigate ${spec.metric} evidence, and statically review a realistic frontend artifact.`,
+    exampleLabel: enrichment.label,
+    example: enrichment.example,
+    exampleNote: enrichment.exampleNote,
+    mistake: `${enrichment.diagnostic} A common mistake is to hide “${spec.failure}” with a cosmetic fallback instead of repairing and retesting the actual boundary.`,
+    practice: { prompt: enrichment.diagnostic, deliverable: enrichment.deliverable, success: enrichment.success },
+    projectStages,
+    mission: `${enrichment.diagnostic} Repair the ${spec.boundary} experience, justify the tradeoff with ${spec.metric}, and complete both the topic-aligned artifact review and rendering-contract simulation.`,
     fields: [
       field("boundary", "string", `Exact browser or UI boundary: ${spec.boundary}.`),
       field("failure_mode", "string", `The user-visible failure to handle: ${spec.failure}.`),
@@ -133,9 +148,9 @@ function buildLesson(spec: TopicSpec, id: number, paceId: FrontendPaceId): Cloud
 }
 
 export const FRONTEND_CURRICULA: Record<FrontendPaceId, CloudLesson[]> = {
-  beginner: BEGINNER.map((spec, index) => buildLesson(spec, index + 1, "beginner")),
-  intermediate: INTERMEDIATE.map((spec, index) => buildLesson(spec, index + 1, "intermediate")),
-  expert: EXPERT.map((spec, index) => buildLesson(spec, index + 1, "expert")),
+  beginner: BEGINNER.map((spec, index) => buildLesson(spec, index + 1, "beginner", BEGINNER)),
+  intermediate: INTERMEDIATE.map((spec, index) => buildLesson(spec, index + 1, "intermediate", INTERMEDIATE)),
+  expert: EXPERT.map((spec, index) => buildLesson(spec, index + 1, "expert", EXPERT)),
 };
 export const getFrontendLessons = (paceId: FrontendPaceId) => FRONTEND_CURRICULA[paceId];
 export const getFrontendLesson = (paceId: FrontendPaceId, id: number) => getFrontendLessons(paceId).find((lesson) => lesson.id === id);

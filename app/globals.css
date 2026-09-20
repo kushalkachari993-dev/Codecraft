@@ -840,6 +840,21 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px
 .cloud-reading .theory-grid article { grid-template-columns: 46px minmax(0, 1fr); overflow-wrap: anywhere; }
 .cloud-worked-example { margin-top: 28px; }
 .cloud-worked-example > p { margin: 14px 0; color: var(--muted); font-size: var(--type-body); line-height: 1.65; }
+.frontend-practice-brief, .frontend-project-brief { margin: 24px 0; padding: 20px; border: 2px solid var(--line); background: color-mix(in srgb, var(--panel) 88%, var(--cyan) 12%); box-shadow: 5px 5px 0 var(--shadow); }
+.frontend-practice-brief > div > span, .frontend-project-brief > div > small { color: var(--cyan); font: 800 var(--type-small)/1.4 var(--font-geist-mono), monospace; letter-spacing: .06em; }
+.frontend-practice-brief h2, .frontend-project-brief h3 { margin: 6px 0 10px; font: 850 clamp(1rem, 2vw, 1.2rem)/1.25 var(--font-geist-mono), monospace; }
+.frontend-practice-brief > p, .frontend-project-brief > div > p, .frontend-project-brief li p { color: var(--muted); line-height: 1.65; }
+.frontend-practice-brief dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 0; }
+.frontend-practice-brief dl > div { padding: 12px; border: 1px solid var(--line-soft); background: var(--panel); }
+.frontend-practice-brief dt { color: var(--energy); font: 750 var(--type-small)/1.4 var(--font-geist-mono), monospace; }
+.frontend-practice-brief dd { margin: 5px 0 0; color: var(--muted); line-height: 1.55; }
+.frontend-project-brief ol { display: grid; gap: 10px; padding: 0; margin: 18px 0 0; list-style: none; }
+.frontend-project-brief li { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; padding: 14px; border: 1px solid var(--line-soft); background: var(--panel); }
+.frontend-project-brief li > span { display: grid; place-items: center; width: 38px; height: 38px; color: #06131a; background: var(--energy); border: 2px solid color-mix(in srgb, var(--energy), white 30%); font: 900 var(--type-small)/1 var(--font-geist-mono), monospace; }
+.frontend-project-brief li strong { font-family: var(--font-geist-mono), monospace; }
+.frontend-project-brief li p { margin: 4px 0 8px; }
+.frontend-project-brief li small { color: var(--cyan); font-family: var(--font-geist-mono), monospace; }
+@media (max-width: 620px) { .frontend-practice-brief dl { grid-template-columns: 1fr; } }
 .cloud-example { max-width: 100%; overflow: auto; tab-size: 2; }
 .cloud-insights { grid-template-columns: 1fr; }
 .cloud-checkpoint { margin-top: 30px; padding-top: 4px; scroll-margin-top: 100px; }
