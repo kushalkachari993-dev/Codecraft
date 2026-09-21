@@ -14,6 +14,8 @@ import { BACKEND_PATH_TOTAL } from "./backend/track";
 import { getBackendLessons } from "./backend/curriculum";
 import { FRONTEND_PATH_TOTAL } from "./frontend/track";
 import { getFrontendLessons } from "./frontend/curriculum";
+import { DATA_PATH_TOTAL } from "./data/track";
+import { getDataLessons } from "./data/curriculum";
 import { getDailyQuestIndex } from "./daily-quest";
 
 const paceLabel = (pace: JourneyPaceId) => pace[0].toUpperCase() + pace.slice(1);
@@ -63,7 +65,7 @@ export default function TrackLandingApp() {
     if (bestProgress) {
       const [trackId, paceId] = bestProgress[0].split("-");
       return {
-        trackId: trackId === "genai" || trackId === "sql" || trackId === "cloud" || trackId === "backend" || trackId === "frontend" ? trackId : "python",
+        trackId: trackId === "genai" || trackId === "sql" || trackId === "cloud" || trackId === "backend" || trackId === "frontend" || trackId === "data" ? trackId : "python",
         paceId: paceId === "intermediate" || paceId === "expert" ? paceId : "beginner",
         started: true,
         tutorialComplete: true,
@@ -87,6 +89,7 @@ export default function TrackLandingApp() {
   const cloudDailyLesson = chosenTrackId === "cloud" ? getCloudLessons(dailyPaceId)[getDailyQuestIndex(today, "cloud", dailyPaceId, CLOUD_PATH_TOTAL)] : undefined;
   const backendDailyLesson = chosenTrackId === "backend" ? getBackendLessons(dailyPaceId)[getDailyQuestIndex(today, "backend", dailyPaceId, BACKEND_PATH_TOTAL)] : undefined;
   const frontendDailyLesson = chosenTrackId === "frontend" ? getFrontendLessons(dailyPaceId)[getDailyQuestIndex(today, "frontend", dailyPaceId, FRONTEND_PATH_TOTAL)] : undefined;
+  const dataDailyLesson = chosenTrackId === "data" ? getDataLessons(dailyPaceId)[getDailyQuestIndex(today, "data", dailyPaceId, DATA_PATH_TOTAL)] : undefined;
 
   return (
     <main className="app-shell track-python">
@@ -115,8 +118,8 @@ export default function TrackLandingApp() {
         totalBadges={totalBadges}
         dailyQuest={{
           completed: dailyCompleted,
-          title: cloudDailyLesson?.title ?? backendDailyLesson?.title ?? frontendDailyLesson?.title ?? "Today’s Relay Challenge",
-          trackLabel: chosenTrackId === "cloud" ? "Cloud Engineering" : chosenTrackId === "backend" ? "Backend Engineering" : chosenTrackId === "frontend" ? "Frontend Web Development" : dailyTrack.label,
+          title: cloudDailyLesson?.title ?? backendDailyLesson?.title ?? frontendDailyLesson?.title ?? dataDailyLesson?.title ?? "Today’s Relay Challenge",
+          trackLabel: chosenTrackId === "cloud" ? "Cloud Engineering" : chosenTrackId === "backend" ? "Backend Engineering" : chosenTrackId === "frontend" ? "Frontend Web Development" : chosenTrackId === "data" ? "Data Engineering" : dailyTrack.label,
           paceLabel: paceLabel(dailyPaceId),
           streak: progress.game.dailyQuestStreak,
           onOpen: () => navigate(`/daily-quest/${dailyTrackId}/${dailyPaceId}`),

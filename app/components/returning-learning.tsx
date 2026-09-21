@@ -18,12 +18,16 @@ async function loadPath(visit: LessonVisit): Promise<PathSummary> {
     const { getFrontendLessons } = await import("../frontend/curriculum");
     return { lessons: getFrontendLessons(visit.paceId), projects: [] };
   }
+  if (visit.trackId === "data") {
+    const { getDataLessons } = await import("../data/curriculum");
+    return { lessons: getDataLessons(visit.paceId), projects: [] };
+  }
   const catalog = await import("../codecraft-catalog");
   const lessons = visit.trackId === "python" ? catalog.buildPythonPaceQuests(visit.paceId) : visit.trackId === "genai" ? catalog.buildGenAIPaceQuests(visit.paceId) : catalog.buildSQLPaceQuests(visit.paceId);
   const getModule = visit.trackId === "python" ? catalog.getPythonModule : visit.trackId === "genai" ? catalog.getGenAIModule : catalog.getSQLModule;
   return { lessons: lessons.map(l => ({ id: l.id, title: l.concept })), projects: lessons.filter(l => getModule(visit.paceId, l.id).end === l.id).map(l => l.id) };
 }
-const labels = { python: "Python", genai: "GenAI", sql: "SQL", cloud: "Cloud Engineering", backend: "Backend Engineering", frontend: "Frontend Web Development" };
+const labels = { python: "Python", genai: "GenAI", sql: "SQL", cloud: "Cloud Engineering", backend: "Backend Engineering", frontend: "Frontend Web Development", data: "Data Engineering" };
 function ReviewCard({ item, onResult }: { item: ReviewItem; onResult: (key: string, correct: boolean) => void }) {
   const [choice, setChoice] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");

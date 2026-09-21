@@ -5,6 +5,7 @@ export const PROGRESS_KEYS = [
   "cloud-beginner", "cloud-intermediate", "cloud-expert",
   "backend-beginner", "backend-intermediate", "backend-expert",
   "frontend-beginner", "frontend-intermediate", "frontend-expert",
+  "data-beginner", "data-intermediate", "data-expert",
 ] as const;
 
 export type AvatarId = "relay-scout" | "signal-mage" | "core-runner";

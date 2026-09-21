@@ -6,7 +6,7 @@ export type ReviewItem = LessonVisit & ReviewQuestion & { key: string; misses: n
 export type LearningMemory = { lastVisit: LessonVisit | null; reviews: ReviewItem[] };
 const STORAGE_KEY = "codecraft-learning-memory-v1";
 export const MEMORY_EVENT = "codecraft-learning-memory";
-const tracks = ["python", "genai", "sql", "cloud", "backend", "frontend"];
+const tracks = ["python", "genai", "sql", "cloud", "backend", "frontend", "data"];
 const paces = ["beginner", "intermediate", "expert"];
 const text = (v: unknown, limit: number): v is string => typeof v === "string" && v.length > 0 && v.length <= limit;
 function validVisit(v: unknown): v is LessonVisit {

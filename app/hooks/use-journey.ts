@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export type JourneyTrackId = "python" | "genai" | "sql" | "cloud" | "backend" | "frontend";
+export type JourneyTrackId = "python" | "genai" | "sql" | "cloud" | "backend" | "frontend" | "data";
 export type JourneyPaceId = "beginner" | "intermediate" | "expert";
 
 export type JourneyPreferences = {
@@ -23,7 +23,7 @@ const DEFAULT_JOURNEY: JourneyPreferences = {
 export function loadJourneyPreferences(): JourneyPreferences {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(JOURNEY_STORAGE_KEY) ?? "{}") as Partial<JourneyPreferences>;
-    const trackId = parsed.trackId === "genai" || parsed.trackId === "sql" || parsed.trackId === "cloud" || parsed.trackId === "backend" || parsed.trackId === "frontend" ? parsed.trackId : "python";
+    const trackId = parsed.trackId === "genai" || parsed.trackId === "sql" || parsed.trackId === "cloud" || parsed.trackId === "backend" || parsed.trackId === "frontend" || parsed.trackId === "data" ? parsed.trackId : "python";
     const paceId = parsed.paceId === "intermediate" || parsed.paceId === "expert" ? parsed.paceId : "beginner";
     return {
       trackId,
