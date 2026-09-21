@@ -102,6 +102,7 @@ export default function TrackLandingApp() {
           <button className="active" onClick={() => navigate("/tracks")}>Tracks</button>
           <button onClick={resumeJourney}>Roadmap</button>
           <button className="daily-nav" onClick={() => navigate(`/daily-quest/${dailyTrackId}/${dailyPaceId}`)}>Daily Quest</button>
+          <button onClick={() => navigate("/portfolio")}>Portfolio</button>
         </nav>
         <div className="player-stats">
           <button className="stat-chip profile-stat-trigger" onClick={() => navigate("/profile")} aria-label={`Open profile, ${progress.xp} XP`}><b>◆</b> {progress.xp} XP</button>

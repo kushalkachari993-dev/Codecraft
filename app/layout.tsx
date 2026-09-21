@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://codecraft-block-quests.kushalkachari993.chatgpt.site";
 const title = "CodeCraft — An Original Voxel Coding Adventure";
-const description = "Explore the original Code Realms with Byte, choose a learning path, and master Python, GenAI, or SQL through story-led lessons and checkpoints.";
+const description = "Explore the original Code Realms with Byte, master seven engineering tracks, and turn hands-on learning into portfolio-ready flagship projects.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

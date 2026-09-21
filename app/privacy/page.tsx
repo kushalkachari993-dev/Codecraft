@@ -12,12 +12,16 @@ export default function PrivacyPage() {
       <header className="legal-hero">
         <p>CODECRAFT · PLAYER DATA CHARTER</p>
         <h1>Privacy</h1>
-        <span>Effective August 26, 2026 · Early public beta</span>
+        <span>Effective September 21, 2026 · Early public beta</span>
       </header>
 
       <section>
         <h2>What CodeCraft stores</h2>
-        <p>When you sign in, CodeCraft stores your Clerk user identifier, display name, email address, XP, completed topics, badges, projects, saved code submissions, and daily AI-review count. Signed-out progress stays in your browser.</p>
+        <p>When you sign in, CodeCraft stores your Clerk user identifier, display name, email address, XP, completed topics, badges, project milestone evidence, portfolio rubric scores, saved code submissions, and daily AI-review count. Signed-out progress and portfolio drafts stay in your browser.</p>
+      </section>
+      <section>
+        <h2>Portfolio sharing</h2>
+        <p>Portfolio share links contain the learner name, project score, milestone count, readiness status, and demonstrated skills at the time the link is created. They do not contain private evidence notes or account identifiers. Anyone who receives a share link can view that snapshot, so create and distribute it only when you want those summary details to be public.</p>
       </section>
       <section>
         <h2>Beta analytics</h2>
@@ -30,7 +34,7 @@ export default function PrivacyPage() {
       </section>
       <section>
         <h2>Why it is used</h2>
-        <p>This information restores learning progress across devices, displays your profile, saves optional challenge attempts, prevents GenAI cost abuse, measures whether the learning journey works, prioritizes beta improvements, and helps operate the service safely.</p>
+        <p>This information restores learning and portfolio progress across devices, displays your profile, saves optional challenge attempts, prevents GenAI cost abuse, measures whether the learning journey works, prioritizes beta improvements, and helps operate the service safely.</p>
       </section>
       <section>
         <h2>Code execution and GenAI labs</h2>
@@ -42,7 +46,7 @@ export default function PrivacyPage() {
       </section>
       <section>
         <h2>Retention and deletion</h2>
-        <p>Cloud progress, submissions, and beta feedback are retained while your account exists or while they are needed to operate the beta. Raw analytics events expire after 90 days. Deleting your account removes your CodeCraft profile, cloud progress, submissions, AI-review usage, linked analytics and feedback, and Clerk identity. Anonymous events cannot identify you directly and expire automatically.</p>
+        <p>Cloud progress, portfolio evidence, submissions, and beta feedback are retained while your account exists or while they are needed to operate the beta. Raw analytics events expire after 90 days. Deleting your account removes your CodeCraft profile, cloud progress, portfolio evidence, submissions, AI-review usage, linked analytics and feedback, and Clerk identity. Previously shared portfolio links are self-contained snapshots; CodeCraft cannot revoke a copy that another person already saved.</p>
         <Link className="legal-danger-link" href="/account/delete">Open account deletion controls →</Link>
       </section>
       <section>

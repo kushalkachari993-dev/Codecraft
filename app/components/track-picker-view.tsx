@@ -33,6 +33,7 @@ export default function TrackPickerView({ journey, totalBadges, dailyQuest, prog
   return (
     <section className="track-picker">
       <ReturningLearning progress={progress} journey={journey} onResume={onResume} />
+      <a className="portfolio-entry-card" href="/portfolio"><span aria-hidden="true">◆</span><div><strong>Build your engineering portfolio</strong><small>Complete seven flagship projects, save milestone evidence, assess your work, and create a privacy-safe showcase.</small></div><b>OPEN PROJECT LAB →</b></a>
       <div className="track-picker-hero">
         <p className="pixel-kicker">ORIGINAL CODE REALMS · CHOOSE YOUR MISSION</p>
         <h1>Repair the Core Relay.<br /><span>Master real code.</span></h1>

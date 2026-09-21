@@ -158,7 +158,7 @@ export default function ProfilePanel(props: ProfilePanelProps) {
             <SignInButton mode="modal"><button onClick={props.onClose}>Sign in to sync and edit name</button></SignInButton>
           )}
         </footer>
-        <div className="profile-policy-links"><a href="/privacy">Privacy</a><span>·</span><a href="/api/health">Service status</a>{props.signedIn && <><span>·</span><a href="/admin/analytics">Owner insights</a></>}</div>
+        <div className="profile-policy-links"><a href="/portfolio">Portfolio projects</a><span>·</span><a href="/privacy">Privacy</a><span>·</span><a href="/api/health">Service status</a>{props.signedIn && <><span>·</span><a href="/admin/analytics">Owner insights</a></>}</div>
       </section>
     </div>
   );

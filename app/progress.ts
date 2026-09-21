@@ -9,6 +9,20 @@ export const PROGRESS_KEYS = [
 ] as const;
 
 export type AvatarId = "relay-scout" | "signal-mage" | "core-runner";
+export const PORTFOLIO_TRACK_IDS = ["python", "genai", "sql", "cloud", "backend", "frontend", "data"] as const;
+export const PORTFOLIO_MILESTONE_IDS = ["brief", "design", "build", "verify", "present"] as const;
+export const PORTFOLIO_RUBRIC_IDS = ["correctness", "decisions", "reliability", "communication"] as const;
+export type PortfolioTrackId = typeof PORTFOLIO_TRACK_IDS[number];
+export type PortfolioProjectProgress = {
+  completedMilestones: string[];
+  evidence: Record<string, string>;
+  rubric: Record<string, number>;
+  updatedAt: number;
+};
+export type PortfolioProgress = {
+  projects: Partial<Record<PortfolioTrackId, PortfolioProjectProgress>>;
+  updatedAt: number;
+};
 export type GameProfile = {
   avatarId: AvatarId;
   soundEnabled: boolean;
@@ -33,6 +47,7 @@ export type PlayerProgress = {
   coding: Record<string, number[]>;
   bonus: Record<string, number[]>;
   game: GameProfile;
+  portfolio: PortfolioProgress;
 };
 
 export const DEFAULT_GAME_PROFILE: GameProfile = {
@@ -59,7 +74,37 @@ export const DEFAULT_PROGRESS: PlayerProgress = {
   coding: Object.fromEntries(PROGRESS_KEYS.map((key) => [key, []])),
   bonus: Object.fromEntries(PROGRESS_KEYS.map((key) => [key, []])),
   game: DEFAULT_GAME_PROFILE,
+  portfolio: { projects: {}, updatedAt: 0 },
 };
+
+function cleanPortfolioProject(value: unknown): PortfolioProjectProgress {
+  const source = value && typeof value === "object" ? value as Partial<PortfolioProjectProgress> : {};
+  const milestoneIds = new Set<string>(PORTFOLIO_MILESTONE_IDS);
+  const rubricIds = new Set<string>(PORTFOLIO_RUBRIC_IDS);
+  const evidenceSource = source.evidence && typeof source.evidence === "object" ? source.evidence : {};
+  const rubricSource = source.rubric && typeof source.rubric === "object" ? source.rubric : {};
+  return {
+    completedMilestones: Array.isArray(source.completedMilestones)
+      ? [...new Set(source.completedMilestones.filter((item): item is string => typeof item === "string" && milestoneIds.has(item)))]
+      : [],
+    evidence: Object.fromEntries(Object.entries(evidenceSource).filter(([key, item]) => milestoneIds.has(key) && typeof item === "string").map(([key, item]) => [key, String(item).slice(0, 1_200)])),
+    rubric: Object.fromEntries(Object.entries(rubricSource).filter(([key]) => rubricIds.has(key)).map(([key, item]) => [key, Number.isInteger(item) ? Math.max(0, Math.min(3, Number(item))) : 0])),
+    updatedAt: typeof source.updatedAt === "number" && Number.isFinite(source.updatedAt) ? Math.max(0, Math.floor(source.updatedAt)) : 0,
+  };
+}
+
+function cleanPortfolio(value: unknown): PortfolioProgress {
+  const source = value && typeof value === "object" ? value as Partial<PortfolioProgress> : {};
+  const projectsSource = source.projects && typeof source.projects === "object" ? source.projects : {};
+  const projects: PortfolioProgress["projects"] = {};
+  for (const trackId of PORTFOLIO_TRACK_IDS) {
+    if (trackId in projectsSource) projects[trackId] = cleanPortfolioProject((projectsSource as Record<string, unknown>)[trackId]);
+  }
+  return {
+    projects,
+    updatedAt: typeof source.updatedAt === "number" && Number.isFinite(source.updatedAt) ? Math.max(0, Math.floor(source.updatedAt)) : 0,
+  };
+}
 
 function cleanIds(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
@@ -108,6 +153,7 @@ export function normalizeProgress(value: unknown): PlayerProgress {
     coding: cleanBucket(source.coding),
     bonus: cleanBucket(source.bonus),
     game: cleanGame(source.game),
+    portfolio: cleanPortfolio(source.portfolio),
   };
 }
 
@@ -117,6 +163,14 @@ export function mergeProgress(local: PlayerProgress, cloud: PlayerProgress): Pla
   const localGame = cleanGame(local.game);
   const cloudGame = cleanGame(cloud.game);
   const newestGame = localGame.updatedAt >= cloudGame.updatedAt ? localGame : cloudGame;
+  const localPortfolio = cleanPortfolio(local.portfolio);
+  const cloudPortfolio = cleanPortfolio(cloud.portfolio);
+  const portfolioProjects: PortfolioProgress["projects"] = {};
+  for (const trackId of PORTFOLIO_TRACK_IDS) {
+    const left = localPortfolio.projects[trackId];
+    const right = cloudPortfolio.projects[trackId];
+    if (left || right) portfolioProjects[trackId] = !right || (left?.updatedAt ?? 0) >= right.updatedAt ? cleanPortfolioProject(left) : cleanPortfolioProject(right);
+  }
   const sameDailyDate = localGame.dailyDate && localGame.dailyDate === cloudGame.dailyDate;
   const sameDailyQuestDate = localGame.dailyQuestDate && localGame.dailyQuestDate === cloudGame.dailyQuestDate;
   return {
@@ -141,5 +195,6 @@ export function mergeProgress(local: PlayerProgress, cloud: PlayerProgress): Pla
       inventory: [...new Set([...localGame.inventory, ...cloudGame.inventory])],
       worldPowerClaims: [...new Set([...localGame.worldPowerClaims, ...cloudGame.worldPowerClaims])].slice(-300),
     },
+    portfolio: { projects: portfolioProjects, updatedAt: Math.max(localPortfolio.updatedAt, cloudPortfolio.updatedAt) },
   };
 }
