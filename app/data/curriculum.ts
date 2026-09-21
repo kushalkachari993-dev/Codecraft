@@ -1,4 +1,5 @@
 import { check, exactSet, field, type CloudLesson, type CloudPlan } from "../cloud/model";
+import { getDataEnrichment } from "./enrichment";
 import type { DataPaceId } from "./track";
 
 type SourceKey = "fundamentals" | "sql" | "parquet" | "warehouse" | "orchestration" | "spark" | "streaming" | "governance" | "reliability";
@@ -88,7 +89,8 @@ const EXPERT: TopicSpec[] = [
 ];
 
 function exampleFor(spec: TopicSpec, paceId: DataPaceId) {
-  return `# ${spec.title} · ${paceId} review\ninput_boundary: ${spec.boundary}\nfailure_hypothesis: ${spec.failure}\nprimary_signal: ${spec.signal}\ncontrols:\n  - ${spec.controls[0]}\n  - ${spec.controls[1]}\n  - ${spec.controls[2]}\nverification: reconcile counts, rejected records, and consumer-visible output`;
+  const enrichment = getDataEnrichment(spec.title);
+  return `# ${spec.title} · ${paceId} case\ncase_type: ${enrichment.label}\nscenario: ${enrichment.scenario}\nevidence: ${enrichment.evidence}\nboundary: ${spec.boundary}\ndecision: ${enrichment.decision}\nproof: ${enrichment.proof}`;
 }
 
 function buildLesson(spec: TopicSpec, id: number, paceId: DataPaceId, all: TopicSpec[]): CloudLesson {
@@ -96,6 +98,7 @@ function buildLesson(spec: TopicSpec, id: number, paceId: DataPaceId, all: Topic
   const solution: CloudPlan = { boundary: spec.boundary, failure_mode: spec.failure, freshness_minutes: freshness, replay_safe: true, quarantine_enabled: true, quality_checks: [...spec.controls] };
   const starter: CloudPlan = { boundary: "implicit", failure_mode: "happy-path-only", freshness_minutes: 1440, replay_safe: false, quarantine_enabled: false, quality_checks: [spec.controls[0]] };
   const isProject = [5, 10, 15, 21].includes(id);
+  const enrichment = getDataEnrichment(spec.title);
   const start = id === 21 ? 16 : id - 4;
   const world = all.slice(start - 1, id);
   return {
@@ -103,15 +106,15 @@ function buildLesson(spec: TopicSpec, id: number, paceId: DataPaceId, all: Topic
     objective: spec.goal,
     story: `The ${spec.boundary} boundary is missing a trustworthy ${spec.signal} signal. Trace the data before Byte restores this section of the Data Grid.`,
     concepts: [
-      { title: "Model the data boundary", body: `${spec.goal} Start by naming the producing system, the consuming system, the unit of data, and who owns the contract when either side changes.` },
-      { title: "Protect correctness", body: `The concrete failure is that ${spec.failure}. Preserve raw evidence, make the transformation deterministic, and separate acceptance, rejection, and publication decisions.` },
-      { title: "Design for replay", body: `Assume a task can fail after partial work. ${spec.controls.join(", ")} must remain independently verifiable so a retry or backfill converges instead of duplicating or losing records.` },
-      { title: "Prove the outcome", body: `Use ${spec.signal} as the primary signal, then reconcile input, output, rejected, and late records. Task success alone is not proof that consumer-visible data is correct.` },
+      { title: "Model the data boundary", body: `${spec.goal} In this case, ${enrichment.scenario} Name the producer, consumer, record grain, time semantics, and accountable owner before selecting a tool.` },
+      { title: "Read the evidence", body: `${enrichment.evidence}. This evidence narrows the failure to ${spec.boundary}; it does not yet prove why ${spec.failure}.` },
+      { title: "Make the engineering decision", body: `${enrichment.decision} Keep ${spec.controls.join(", ")} independently observable so a repair can be reviewed, replayed, and reversed.` },
+      { title: "Prove the outcome", body: `${enrichment.proof} Use ${spec.signal} as the leading signal, then reconcile input, accepted, rejected, late, and published records at consumer-visible boundaries.` },
     ],
-    exampleLabel: "DATA CONTRACT WALKTHROUGH", example: exampleFor(spec, paceId),
-    exampleNote: `The example ties one explicit boundary to one failure hypothesis, a measurable ${spec.signal} outcome, and three controls. It is review evidence, not a deployable pipeline.`,
-    mistake: `Treating a green job as proof of correctness while ${spec.failure}. Verify record-level and consumer-level outcomes before declaring recovery.`,
-    practice: { prompt: `Given a run affected because ${spec.failure}, identify the first trustworthy boundary and the smallest experiment that distinguishes source, transformation, and publication causes.`, deliverable: `Produce a concise ${spec.title.toLowerCase()} review with the data grain, owner, input/output reconciliation, rejected-record handling, and a replay decision.`, success: `${spec.signal} improves while ${spec.controls.join(", ")} remain visible in independent evidence.` },
+    exampleLabel: enrichment.label, example: exampleFor(spec, paceId),
+    exampleNote: `The decision follows the observed ${enrichment.evidence} signal and defines a falsifiable proof: ${enrichment.proof} This is an educational review, not a deployable pipeline.`,
+    mistake: `Treating a green task or a familiar tool as proof of correctness while ${spec.failure}. The lesson requires evidence at the actual ${spec.boundary} boundary.`,
+    practice: { prompt: `${enrichment.scenario} Using only “${enrichment.evidence}”, state the leading hypothesis, one competing hypothesis, and the smallest safe test that separates them.`, deliverable: `Write a ${spec.title.toLowerCase()} decision record containing grain, owner, interval, reconciliation equation, rejected-record policy, replay boundary, and one rejected alternative.`, success: enrichment.proof },
     projectStages: isProject ? [
       { title: `Profile ${world[0].title}`, brief: `Capture grain, ownership, counts, and a reproducible failure at ${world[0].boundary}.`, evidence: `a source-to-stage reconciliation tied to ${world[0].signal}` },
       { title: `Connect ${world[1].title} and ${world[2].title}`, brief: "Build the smallest vertical slice that preserves both contracts, including rejected and late records.", evidence: "one accepted case, one rejected case, and one compatibility decision" },

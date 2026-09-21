@@ -1,6 +1,7 @@
 import type { CloudEvidenceExercise, CloudEvidenceKind } from "../cloud/evidence";
 import type { CloudLesson } from "../cloud/model";
 import type { DataPaceId } from "./track";
+import { getDataEnrichment } from "./enrichment";
 
 const kinds: CloudEvidenceKind[] = ["logs", "traces", "timeline", "plan-diff", "cost-report"];
 const offsets: Record<DataPaceId, number> = { beginner: 0, intermediate: 2, expert: 4 };
@@ -9,6 +10,7 @@ export function getDataEvidenceExercise(paceId: DataPaceId, lesson: CloudLesson)
   const kind = kinds[(lesson.id - 1 + offsets[paceId]) % kinds.length];
   const failure = String(lesson.solution.failure_mode);
   const control = lesson.checks[0].name;
+  const enrichment = getDataEnrichment(lesson.title);
   let label = "Pipeline logs", title = "Reconcile a failed batch", evidence = `run=data-${lesson.id}-7f2 interval=2026-09-20\nextract rows=128420\ntransform accepted=128106 rejected=314\npublish rows=127806 status=success\nquality ${control}=missing\nwarning ${failure}`;
   let question = "Which response is best supported by this evidence?";
   let correct = "Quarantine the published interval, locate the missing 300 accepted records, and reconcile with the run manifest before replay.";
@@ -34,5 +36,5 @@ export function getDataEvidenceExercise(paceId: DataPaceId, lesson: CloudLesson)
   }
   const source = [correct, wrongA, wrongB] as const; const shift = (lesson.id + offsets[paceId]) % 3;
   const options = source.map((_, index) => source[(index + shift) % 3]) as [string, string, string];
-  return { kind, label, title, briefing: `Investigate evidence for ${lesson.title} without assuming task success equals data correctness.`, evidence: `lesson ${lesson.id} · ${lesson.title}\n${evidence}`, question, options, answer: options.indexOf(correct), explanation };
+  return { kind, label, title, briefing: `${enrichment.scenario} Investigate the evidence without assuming task success equals data correctness.`, evidence: `lesson ${lesson.id} · ${lesson.title}\ncase_signal: ${enrichment.evidence}\n${evidence}`, question, options, answer: options.indexOf(correct), explanation: `${explanation} Acceptance proof: ${enrichment.proof}` };
 }
