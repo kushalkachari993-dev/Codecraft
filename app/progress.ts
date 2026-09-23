@@ -6,10 +6,11 @@ export const PROGRESS_KEYS = [
   "backend-beginner", "backend-intermediate", "backend-expert",
   "frontend-beginner", "frontend-intermediate", "frontend-expert",
   "data-beginner", "data-intermediate", "data-expert",
+  "security-beginner", "security-intermediate", "security-expert",
 ] as const;
 
 export type AvatarId = "relay-scout" | "signal-mage" | "core-runner";
-export const PORTFOLIO_TRACK_IDS = ["python", "genai", "sql", "cloud", "backend", "frontend", "data"] as const;
+export const PORTFOLIO_TRACK_IDS = ["python", "genai", "sql", "cloud", "backend", "frontend", "data", "security"] as const;
 export const PORTFOLIO_MILESTONE_IDS = ["brief", "design", "build", "verify", "present"] as const;
 export const PORTFOLIO_RUBRIC_IDS = ["correctness", "decisions", "reliability", "communication"] as const;
 export type PortfolioTrackId = typeof PORTFOLIO_TRACK_IDS[number];

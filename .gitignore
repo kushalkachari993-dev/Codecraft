@@ -41,6 +41,7 @@ yarn-error.log*
 /dist/
 /.wrangler/
 /outputs/
+/output/
 /work/
 /.playwright-cli/
 *.tsbuildinfo

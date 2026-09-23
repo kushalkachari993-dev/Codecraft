@@ -11,8 +11,8 @@ const { DEFAULT_PROGRESS, PORTFOLIO_MILESTONE_IDS, PORTFOLIO_RUBRIC_IDS, mergePr
 const { PORTFOLIO_PROJECTS, buildPortfolioShowcase, decodePortfolioShowcase, encodePortfolioShowcase, portfolioProjectComplete, portfolioProjectScore } = await loadModule("app/portfolio/catalog.ts");
 
 test("portfolio ships one complete flagship brief per track", () => {
-  assert.equal(PORTFOLIO_PROJECTS.length, 7);
-  assert.equal(new Set(PORTFOLIO_PROJECTS.map((project) => project.id)).size, 7);
+  assert.equal(PORTFOLIO_PROJECTS.length, 8);
+  assert.equal(new Set(PORTFOLIO_PROJECTS.map((project) => project.id)).size, 8);
   for (const project of PORTFOLIO_PROJECTS) {
     assert.equal(project.milestones.length, 5, project.id);
     assert.deepEqual(project.milestones.map((milestone) => milestone.id), PORTFOLIO_MILESTONE_IDS);

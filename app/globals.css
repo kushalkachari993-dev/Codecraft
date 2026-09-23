@@ -975,6 +975,9 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px
 .track-card.data { --track: var(--cyan); --track-soft: #164c55; }
 .track-card.data .track-art::before { background-color: var(--track-soft); }
 .track-card.data .track-art > span { animation-delay: -4.1s; }
+.track-card.security { --track: var(--gold); --track-soft: #514329; }
+.track-card.security .track-art::before { background-color: var(--track-soft); }
+.track-card.security .track-art > span { animation-delay: -2.7s; }
 .cloud-app { color: var(--text); }
 .cloud-app :focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
 .cloud-skip { position: fixed; top: -100px; left: 16px; z-index: 100; padding: 12px 16px; background: var(--panel); color: var(--cyan); }

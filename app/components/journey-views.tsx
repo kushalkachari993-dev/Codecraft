@@ -13,6 +13,7 @@ import CloudTrackCard from "./cloud-track-card";
 import BackendTrackCard from "./backend-track-card";
 import FrontendTrackCard from "./frontend-track-card";
 import DataTrackCard from "./data-track-card";
+import SecurityTrackCard from "./security-track-card";
 
 type Pace = {
   id: JourneyPaceId;
@@ -38,7 +39,7 @@ export function TrackPickerView({ journey, totalBadges, dailyQuest, progress, re
   return (
     <section className="track-picker">
       <ReturningLearning progress={progress} journey={journey} onResume={onResume} />
-      <a className="portfolio-entry-card" href="/portfolio"><span aria-hidden="true">◆</span><div><strong>Build your engineering portfolio</strong><small>Complete seven flagship projects, save milestone evidence, assess your work, and create a privacy-safe showcase.</small></div><b>OPEN PROJECT LAB →</b></a>
+      <a className="portfolio-entry-card" href="/portfolio"><span aria-hidden="true">◆</span><div><strong>Build your engineering portfolio</strong><small>Complete eight flagship projects, save milestone evidence, assess your work, and create a privacy-safe showcase.</small></div><b>OPEN PROJECT LAB →</b></a>
       <div className="track-picker-hero">
         <p className="pixel-kicker">ORIGINAL CODE REALMS · CHOOSE YOUR MISSION</p>
         <h1>Repair the Core Relay.<br /><span>Master real code.</span></h1>
@@ -56,6 +57,7 @@ export function TrackPickerView({ journey, totalBadges, dailyQuest, progress, re
           <button className={recommendation === "backend" ? "active" : ""} onClick={() => onRecommend("backend")}><strong>Backend systems</strong><span>APIs, reliability, architecture</span></button>
           <button className={recommendation === "frontend" ? "active" : ""} onClick={() => onRecommend("frontend")}><strong>Web interfaces</strong><span>UI, accessibility, performance</span></button>
           <button className={recommendation === "data" ? "active" : ""} onClick={() => onRecommend("data")}><strong>Data platforms</strong><span>Pipelines, streaming, governance</span></button>
+          <button className={recommendation === "security" ? "active" : ""} onClick={() => onRecommend("security")}><strong>Cybersecurity</strong><span>Secure design, detection, response</span></button>
         </div>
       </section>
       <div className="track-grid four-tracks five-tracks">
@@ -83,6 +85,7 @@ export function TrackPickerView({ journey, totalBadges, dailyQuest, progress, re
         <BackendTrackCard progress={progress} recommended={recommendation === "backend"} />
         <FrontendTrackCard progress={progress} recommended={recommendation === "frontend"} />
         <DataTrackCard progress={progress} recommended={recommendation === "data"} />
+        <SecurityTrackCard progress={progress} recommended={recommendation === "security"} />
       </div>
       <div className="codecraft-lore" aria-label="CodeCraft universe"><article><span>01</span><div><small>YOUR GUIDE</small><strong>Byte</strong><p>A relay guardian who turns your code into actions inside each realm.</p></div></article><article><span>02</span><div><small>YOUR POWER</small><strong>Signal shards</strong><p>Earned through understanding, checkpoints, and optional practice.</p></div></article><article><span>03</span><div><small>YOUR MISSION</small><strong>The Core Relay</strong><p>Reconnect every realm and return knowledge to the network.</p></div></article></div>
       <div className="track-picker-note"><span>◆</span><p><strong>{cloudUser ? "Progress synced across devices" : "Progress stays with you"}</strong>{cloudUser ? `Signed in as ${cloudUser.displayName}. Local progress was merged safely with your cloud save.` : "Your XP, badges, and restored systems stay on this device. Sign in above to migrate and sync them."}</p></div>

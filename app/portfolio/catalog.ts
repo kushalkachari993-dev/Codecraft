@@ -134,6 +134,20 @@ export const PORTFOLIO_PROJECTS: PortfolioProject[] = [
       milestone("present", "Defend the platform", "An architecture brief, dataset guide, ownership map, and operator runbook.", "Explain how a reviewer can verify trust, cost, recovery, and consumer outcomes."),
     ],
   },
+  {
+    id: "security", label: "Cybersecurity Engineering", icon: "SE", title: "Trustworthy Multi-Service Platform", role: "Security engineer",
+    scenario: "A fictional multi-tenant service has broad permissions, untrusted inputs, weak release provenance, and fragmented incident evidence.",
+    outcome: "Produce a defensible architecture, tested positive and negative controls, detection evidence, and a bounded recovery plan.",
+    skills: ["Threat modeling", "Identity and isolation", "Secure delivery", "Detection", "Incident response"],
+    artifacts: ["Threat model", "Policy and infrastructure review", "Release evidence", "Detection cases", "Incident runbook"],
+    milestones: [
+      milestone("brief", "Map the trust boundary", "Assets, actors, abuse cases, legitimate journeys, and assumptions.", "Explain which request crosses which boundary and how harm could occur."),
+      milestone("design", "Choose layered controls", "A control map with least privilege, isolation, data protection, and rejected alternatives.", "Connect each control to an abuse case and a known failure mode."),
+      milestone("build", "Repair the static system", "Policy, infrastructure, and delivery artifacts with safe defaults.", "Show the artifact diffs and how each change preserves legitimate access."),
+      milestone("verify", "Investigate and test", "Allowed, denied, and failure-path tests plus correlated synthetic evidence.", "Record expected versus observed results and residual uncertainty."),
+      milestone("present", "Defend recovery", "A reviewer brief, detection ownership, containment timeline, and recovery runbook.", "Explain how the team can identify, contain, restore, and learn from an incident."),
+    ],
+  },
 ];
 
 export function emptyPortfolioProject(): PortfolioProjectProgress {
